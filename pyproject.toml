@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "franta-research"
+version = "0.1.0"
+description = "Recoverable multi-agent scheduler for long-running mathematical research"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "LicenseRef-Proprietary"
+license-files = ["LICENSE"]
+authors = [{name = "Franta"}]
+dependencies = []
+keywords = ["research", "mathematics", "multi-agent", "codex"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Science/Research",
+  "Operating System :: POSIX",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+]
+
+[project.scripts]
+franta = "franta.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["advisor_system*", "dashboard_system*", "franta*", "explorer_system*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+dashboard_system = ["README.md", "static/*", "static/vendor/*", "static/vendor/fonts/*"]
+advisor_system = [
+  "README.md",
+  "skills/*/*.md",
+  "skills/*/references/*.md",
+]
+explorer_system = [
+  "README.md",
+  "skills/*/*.md",
+  "skills/*/references/*.md",
+]

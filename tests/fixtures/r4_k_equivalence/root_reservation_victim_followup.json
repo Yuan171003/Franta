@@ -1,0 +1,86 @@
+{
+  "attempt": 1,
+  "computation_operation_ids": [
+    "COMP-D5-CENTER-LATTICE-001"
+  ],
+  "fact_challenges": [],
+  "is_final": false,
+  "operation_id": "OP-96dce353-7eee-44b7-9365-0da7c962ff9d",
+  "operations": [
+    {
+      "abstract": "Picard-corrected equivariant descent lemma: obstruction classes of simple Fourier–Mukai kernels are meaningful only modulo the linearization obstructions of invariant line bundles on the two factors; this neutralizes the naive Spin(10)/PSO(10) obstruction for the standard projective D5 flop.",
+      "content": "Claim. Let a finite group G act on smooth projective complex varieties X and Y, and let P in D^b(X×Y) be a simple G-invariant Fourier–Mukai kernel inducing an equivalence. For an invariant simple object E, let ob(E) in H^2(G,C^*) denote the obstruction to a G-linearization. Put\nA_X={ob(L):L in Pic(X)^G},  A_Y={ob(M):M in Pic(Y)^G}.\nThen every P_{L,M}=P tensor p_X^*L tensor p_Y^*M is again an equivalence kernel and\nob(P_{L,M})=ob(P)+ob(L)+ob(M).\nConsequently the obstruction intrinsic to the Picard-twist orbit of P is the coset of ob(P) in H^2(G,C^*)/(A_X+A_Y), and that orbit contains an honest G-linearizable kernel exactly when this coset is zero.\n\nProof. Choose isomorphisms phi_g:g^*P→P, lambda_g:g^*L→L, and mu_g:g^*M→M. The failures of the three systems to satisfy the cocycle condition are scalar 2-cocycles c_P,c_L,c_M because the objects are simple. Their tensor-product system has cocycle c_P c_L c_M, proving the formula. Tensoring a Fourier–Mukai kernel by pullbacks of line bundles is pre- and post-composition with line-bundle autoequivalences, so it preserves equivalence. Ploog's linearization criterion says ob=0 exactly when a linearization exists.\n\nApplication to the standard projective D5 flop. Let Spin(10)→PSO(10) have center Z≅mu_4, and let H be a finite subgroup of PSO(10). Pulling back gives 1→Z→H-tilde→H→1. The center acts trivially on the D5 homogeneous varieties, hence on any simple Spin(10)-equivariant kernel by a character chi of Z; the H-linearization obstruction is the pushout chi_*[H-tilde]. On either spinor variety, the ample generator O(h_±) has a Spin(10)-linearization whose central character is the half-spin weight omega_4 or omega_5. These characters generate Hom(mu_4,C^*). In the explicit projective model\nX_±=P(U_±^vee(-2h_±) direct-sum O)→OG_±(5,10),\nthe pullback of O(h_±) is an invariant line bundle on X_±. A suitable power therefore has central character chi^{-1}; twisting the kernel by it makes Z act trivially, so its H-tilde-linearization factors through H. Thus the mere failure of an H-torsor to lift from PSO(10) to Spin(10) cannot obstruct all equivalences for this projective D5 flop.\n\nThe type-D5 lattice assertions were checked exactly in the staged Sage computation COMP-D5-CENTER-LATTICE-001: P/Q≅Z/4, omega_4 and omega_5 have order four, and omega_4+omega_5 lies in Q. External inputs: D. Ploog, Equivariant autoequivalences for finite group actions, Adv. Math. 216 (2007), Proposition/criterion on the H^2 obstruction, arXiv:math/0508625; M. Rampazzo and Y. Xie, Derived equivalence for the simple flop of type D5, arXiv:2410.20446v2, Sections 2.2 and 2.5.",
+      "kind": "claim_add",
+      "operation_id": "OP-CLAIM-PICARD-CORRECTION-001",
+      "proposal_id": "PROP-CLAIM-PICARD-CORRECTION-001",
+      "related_route_ids": [
+        "PROP-ROUTE-DESCENT-001"
+      ]
+    },
+    {
+      "abstract": "Explicit Brauer-base lemma: the standard noncommutative multiplier of (Z/3)^2 remains nonzero on a free product-of-curves torsor over a canonically polarized surface with trivial automorphism group.",
+      "content": "Claim. Let G=(Z/3)^2 and c((a,b),(a',b'))=zeta^(ab'), where zeta is a primitive cube root. There exist a smooth projective complex surface S with K_S ample and Aut(S)=1 and a connected finite etale G-torsor T→S such that the pullback of [c] in H^2(G,C^*) to Br(S) is nonzero.\n\nProof. Choose smooth projective curves C,D of distinct genera at least three such that Aut(C)=Aut(D)=1 and Hom(J_C,J_D)=0; a very general pair has these properties. Choose nonzero classes u in H^1(C,Z/3) and v in H^1(D,Z/3). They define connected cyclic etale covers C_u→C and D_v→D. Set S=C×D and T=C_u×D_v. Then T→S is a connected etale G-torsor. The canonical bundle p_C^*K_C tensor p_D^*K_D is ample. For nonisomorphic hyperbolic curves, automorphisms of their product preserve the two factors; hence Aut(S)=Aut(C)×Aut(D)=1.\n\nUnder the classifying map S→BG, the group cocycle c pulls back to the Kummer cup product u cup v in H^2(S,mu_3): on a Cech cover its value on a triple overlap is zeta^(u_ij v_jk), exactly the displayed multiplier. Kunneth places u cup v as the nonzero simple tensor u⊗v in the cross summand\nH^1(C,Z/3) tensor H^1(D,Z/3) of H^2(S,mu_3).\nThe Kummer exact sequence is\nPic(S)/3 → H^2(S,mu_3) → Br(S)[3] → 0.\nSince Pic^0(S) is divisible, the first map factors through NS(S)/3. The standard product formula gives\nNS(C×D)=Z[C×point] direct-sum Z[point×D] direct-sum Hom(J_C,J_D)\n(up to the principal-polarization identification); the last summand is zero by choice. Thus divisor classes have no cross component, so u cup v survives nontrivially in Br(S)[3]. This proves the claim. The group-cocycle identity and nontrivial commutator were independently checked in COMP-DESCENT-COCYCLE-001.",
+      "kind": "claim_add",
+      "operation_id": "OP-CLAIM-BRAUER-BASE-001",
+      "proposal_id": "PROP-CLAIM-BRAUER-BASE-001",
+      "related_route_ids": [
+        "PROP-ROUTE-DESCENT-001"
+      ]
+    },
+    {
+      "abstract": "Finite-quotient amplifier lemma: a free base torsor turns equivariant crepant fiber data into smooth projective complex K-equivalent total spaces, and a rigid canonical base forces any derived equivalence to descend to the generic fiber.",
+      "content": "Claim. Let G be finite, let T→S be a finite etale G-torsor with T and S smooth projective, and let V_+,V_-,W be connected smooth projective G-varieties with G-equivariant birational morphisms r_±:W→V_±. Assume there is a G-equivariant isomorphism r_+^*omega_{V_+}≅r_-^*omega_{V_-}. Define\nX_±=(T×V_±)/G and Z=(T×W)/G\nfor the diagonal actions. Then X_± and Z are smooth projective complex varieties, the induced maps Z→X_± are birational morphisms, and their pulled-back canonical bundles are isomorphic. Hence X_+ and X_- are K-equivalent.\n\nIf additionally omega_{V_±} has a G-invariant trivialization, then X_±→S are smooth projective morphisms with geometrically connected fibers and trivial relative canonical bundle. If K_S is ample and Aut(S)=1, any equivalence D^b(X_+)≃D^b(X_-) induces a C(S)-linear equivalence of the generic fibers.\n\nProof. The action on each product is free because it is free on T. Finite free quotients of smooth projective varieties are smooth and projective. The product birational morphisms descend and remain birational. The quotient maps are etale, so after pullback to T×W the two canonical bundles in question become\nomega_T box-tensor r_+^*omega_{V_+} and omega_T box-tensor r_-^*omega_{V_-}.\nThe stipulated equivariant isomorphism descends to Z, proving K-equivalence. The relative canonical bundles become pr_V^*omega_{V_±} after the etale base change T→S, so invariant trivializations descend; smoothness and connectedness are etale-local on S. The final assertion is the canonical-base generic-fiber claim already staged in PROP-CLAIM-CANONICAL-BASE-001.",
+      "kind": "claim_add",
+      "operation_id": "OP-CLAIM-QUOTIENT-AMPLIFIER-001",
+      "proposal_id": "PROP-CLAIM-QUOTIENT-AMPLIFIER-001",
+      "related_route_ids": [
+        "PROP-ROUTE-DESCENT-001"
+      ]
+    },
+    {
+      "abstract": "Find a projective equivariant crepant pair for which every Fourier–Mukai equivalence component has nonzero Picard-reduced descent obstruction.",
+      "importance": "This is now the sole local categorical gap in the explicit descent counterexample route: the base surface, Brauer survival, quotient smoothness/projectivity, K-equivalence, and canonical-model reduction have all been supplied. Solving it positively would disprove the root statement; solving it negatively would establish a new equivariant rigidity principle.",
+      "kind": "obligation_add",
+      "operation_id": "OP-OBL-REDUCED-GERBE-001",
+      "partial_progress": "The naive obstruction of one chosen kernel is insufficient because invariant line-bundle twists change it. The standard projective D5 flop fails this refined test: its half-spin hyperplane class realizes every character of the Spin(10) center and cancels any lift obstruction. Cautis's type-A stratified Mukai kernel is also center-neutral in its explicit determinant formula. Candidate searches should therefore prioritize compactified flops whose ambient Picard restriction misses the obstructing homogeneous line class, and must classify all equivalence components up to autoequivalences.",
+      "predecessor_fact_ids": [],
+      "proposal_id": "PROP-OBL-REDUCED-GERBE-001",
+      "related_route_ids": [
+        "PROP-ROUTE-DESCENT-001"
+      ],
+      "relations": [
+        {
+          "conclusion": "ROOT",
+          "explanation": "A positive example for G=(Z/3)^2 whose reduced gerbe is the standard multiplier combines with the explicit product-of-curves torsor to give smooth projective complex K-equivalent total spaces; canonical-ring rigidity would force and the nonneutral generic gerbe would forbid an untwisted derived equivalence.",
+          "premise_memory_ids": [
+            "PROP-CLAIM-CANONICAL-BASE-001",
+            "PROP-CLAIM-KERNEL-GERBE-001",
+            "PROP-CLAIM-BRAUER-BASE-001",
+            "PROP-CLAIM-QUOTIENT-AMPLIFIER-001",
+            "PROP-CLAIM-PICARD-CORRECTION-001"
+          ],
+          "relation_type": "conditional_disproof_route",
+          "supporting_fact_ids": []
+        }
+      ],
+      "statement": "Construct a finite G-equivariant smooth projective crepant birational pair V_+,V_- with equivariant smooth projective common resolution such that, for every simple Fourier–Mukai equivalence kernel P, the coset of ob(P) is nonzero in H^2(G,C^*)/(ob(Pic(V_+)^G)+ob(Pic(V_-)^G)); or prove that some equivalence component always has zero reduced coset. The construction must also have invariant canonical trivializations if it is to be combined directly with the quotient amplifier."
+    },
+    {
+      "abstract": "Current-status audit and attack map for the arbitrary-dimensional K-equivalence implies D-equivalence conjecture, including rigorous known cases, invariant limitations, and the refined descent obstruction.",
+      "content": "Status as of 2026-08-21. The root statement is still the Bondal–Orlov–Kawamata D/K conjecture, not a theorem and not known to have a counterexample. Kawamata formulates precisely the stated implication as Conjecture 1.2 in “D-equivalence and K-equivalence,” J. Differential Geom. 61 (2002), 147–171, arXiv:math/0205287. His Theorem 1.7 proves the three-dimensional terminal-stack version, hence the smooth projective threefold case. The arbitrary-dimensional proof would require genuinely new input: neither factorization of every crepant birational map into controlled flops nor derived equivalence for every higher-dimensional flop is known in this generality.\n\nStrong higher-dimensional islands now include: Daniel Halpern-Leistner, “Derived Theta-stratifications and the D-equivalence conjecture,” accepted by Annals of Mathematics on 2026-02-06, proves equivalence for projective Calabi–Yau manifolds birational to a smooth moduli space of Gieseker-semistable sheaves on a K3 surface (the Annals abstract explicitly calls these the first known birational classes above dimension three); D. Maulik, J. Shen, Q. Yin, R. Zhang, Invent. Math. 241 (2025), 309–324, DOI 10.1007/s00222-025-01339-8, proves the K3^[n]-type hyperkähler case; and many toric/toroidal, GIT-window, standard, Mukai, and named homogeneous flop classes are known. None covers arbitrary smooth projective K-equivalence.\n\nWeak-invariant attacks are increasingly constrained. Motivic integration gives equality of Hodge numbers, and M. Satriano–E. Sundbo, “K-Equivalence and Integral Cohomology,” arXiv:2601.22085, Theorem 1.1, proves isomorphism of all integral cohomology groups. For a simple common blowup in codimension r, the staged categorical Grothendieck-group claim proves that the ambient difference equals the center difference and is r-torsion, so every torsion-free additive invariant is blind. These statements are evidence and obstruction data, not derived equivalence.\n\nRefined counterexample route. Ploog’s H^2(G,C^*) obstruction to linearizing a simple invariant Fourier–Mukai kernel is exact, and the product-of-curves claim now realizes the explicit (Z/3)^2 multiplier as a nonzero Brauer class on a surface S with K_S ample and Aut(S)=1. The quotient-amplifier claim would convert any matching equivariant crepant fiber pair into an actual complex K-equivalent pair, while the canonical ring forces an absolute equivalence to the obstructed generic fiber. However, the obstruction must be computed modulo invariant Picard twists and all equivalence components must be exhausted.\n\nCandidate audit. Cautis’s type-A stratified Mukai-flop kernel (S. Cautis, Compos. Math. 148 (2012), arXiv:0909.0817, Theorem 3.8) is not a candidate: in the formula on each open component the scalar weights of det(C^N/V_1)^(-s) and det(V_2)^s cancel, and the divisorial factor is PGL_N-invariant, yielding center-neutral equivariance. The D5 simple flop initially looked promising because Rampazzo–Xie, arXiv:2410.20446v2, Section 2.5, formulate the relative theorem for Spin(10)-torsors. But the standard projective model carries the half-spin line O(h), whose central character generates Hom(mu_4,C^*); the Picard-correction claim shows that twisting any Spin-equivariant kernel by a suitable power kills its PSO lift obstruction. A viable homogeneous candidate must therefore have an ambient compactification in which the obstructing line class does not extend, and still must rule out nonhomogeneous equivalence kernels and autoequivalences.",
+      "genre": "high-level",
+      "kind": "memo",
+      "operation_id": "OP-MEMO-STATUS-AUDIT-001",
+      "proposal_id": "PROP-MEMO-STATUS-AUDIT-001",
+      "related_route_ids": [
+        "PROP-ROUTE-DESCENT-001"
+      ]
+    }
+  ],
+  "outcome_status": "progress",
+  "progress_id": "PRG-f7426690-1908-4a46-8a87-d854cb496167",
+  "progress_since_previous": "Closed the base-realization part of the descent route for the explicit (Z/3)^2 multiplier, proved that equivariant-kernel obstructions must be reduced modulo invariant Picard twists, and proved the finite-quotient K-equivalence amplifier. Auditing the D5 flop then showed that its apparent Spin-lift obstruction is killed by the half-spin hyperplane line bundle, so that candidate cannot work in the standard projective model.",
+  "sequence": 2,
+  "skill": "record-progress",
+  "task_id": "T-8f64d69ca31b4eba8173e691f5df2949"
+}

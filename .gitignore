@@ -1,0 +1,55 @@
+# Local research projects contain private prompts, proofs, and model transcripts.
+/long_tests/
+/runs/
+/projects/
+/private/
+/example-project/
+private/
+workspaces/
+task-archive/
+
+# Generated distributions and test/build caches.
+/release/
+/dist/
+/build/
+*.egg-info/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.nox/
+.venv/
+venv/
+
+# Credentials and local configuration.
+.env
+.env.*
+!.env.example
+.codex/
+auth.json
+credentials.json
+credentials-*.json
+service-account*.json
+token.json
+tokens.json
+*.pem
+*.key
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+
+# Editor and operating-system files.
+.DS_Store
+._*
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

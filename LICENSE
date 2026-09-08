@@ -1,0 +1,10 @@
+Proprietary
+
+All rights reserved. This project currently has no open-source license.
+Publication of its source code does not grant additional rights to use, copy,
+modify, sublicense, or redistribute it. Obtain permission from the respective
+copyright holders unless applicable law already grants the relevant rights.
+
+Third-party components remain subject to their own licenses. In particular,
+the dashboard's bundled KaTeX assets include their license and notices under
+src/dashboard_system/static/vendor/.

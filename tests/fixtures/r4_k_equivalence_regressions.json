@@ -1,0 +1,196 @@
+{
+  "release_sanitization": "The CAS executable path was replaced with a nonpersonal example and its payload hash refreshed. Mathematical input, output, and event order are unchanged. The original source database is private and is not required to replay these fixtures.",
+  "source_database": "long_tests/r4/k-equivalence-derived/scheduler.sqlite3",
+  "source_database_sha256": "0e44fc59cf91896436c8957c9592814dd678bda01ee9efa6eeb9e817e64a1368",
+  "event_sequence_sha256": "e0b6f215016de7c0453d50ae9b6b6aa2ecbacd92013d556869d16bac446274d9",
+  "payloads": {
+    "root_reservation_prior_progress": {
+      "path": "tests/fixtures/r4_k_equivalence/root_reservation_prior_progress.json",
+      "sha256": "b65224b972cf4d964e2038ecb94991af0227867ca07a4b1f1bb5f92db7520757"
+    },
+    "root_reservation_source": {
+      "path": "tests/fixtures/r4_k_equivalence/root_reservation_source.json",
+      "sha256": "dadc2608d5ec678a8f2413740b493da0def63788cf8e38014fc4e9e263a85ebc"
+    },
+    "root_reservation_victim": {
+      "path": "tests/fixtures/r4_k_equivalence/root_reservation_victim.json",
+      "sha256": "2d4fea50da7a54cd6b7d7f8f261eae0af56b4d3f1111b5858db950709ba1799f"
+    },
+    "root_reservation_victim_followup": {
+      "path": "tests/fixtures/r4_k_equivalence/root_reservation_victim_followup.json",
+      "sha256": "e87cc152f286009663b5547b9a8893a8aa08242aba51fc68f5461a44f0480527"
+    },
+    "cas_progress": {
+      "path": "tests/fixtures/r4_k_equivalence/cas_progress.json",
+      "sha256": "091c83d59d3eefdfba5ce7579a8589803f217a40c191c6fdaa6c12538859b7df"
+    },
+    "cas_final": {
+      "path": "tests/fixtures/r4_k_equivalence/cas_final.json",
+      "sha256": "f002726417ee34df563a46d2bd529d85f6c9aa836eb72ef6ed9dcb6912e36032"
+    },
+    "cas_computation": {
+      "path": "tests/fixtures/r4_k_equivalence/cas_computation.json",
+      "sha256": "adc7af3131bb4e15a9ffed839fd73912bc7fd2e1a1309088ee92574e59fa69ae"
+    }
+  },
+  "event_sequence": [
+    {
+      "event_id": 24,
+      "type": "progress_received",
+      "payload": {
+        "interrupted_salvage": false,
+        "is_final": false,
+        "progress_id": "PRG-4ee06982-7c3b-4c68-990a-91573c923d72",
+        "source_was_final": false,
+        "task_id": "T-6319fbf653d044cd81beb63c46d286d9"
+      }
+    },
+    {
+      "event_id": 28,
+      "type": "progress_received",
+      "payload": {
+        "interrupted_salvage": false,
+        "is_final": false,
+        "progress_id": "PRG-0b074c5c-84cd-4d5d-95ea-ba27433fd217",
+        "source_was_final": false,
+        "task_id": "T-6319fbf653d044cd81beb63c46d286d9"
+      }
+    },
+    {
+      "event_id": 35,
+      "type": "progress_received",
+      "payload": {
+        "interrupted_salvage": false,
+        "is_final": false,
+        "progress_id": "PRG-0fc4a42e-7230-44d0-980b-8d1df2522078",
+        "source_was_final": false,
+        "task_id": "T-8f64d69ca31b4eba8173e691f5df2949"
+      }
+    },
+    {
+      "event_id": 41,
+      "type": "progress_received",
+      "payload": {
+        "interrupted_salvage": false,
+        "is_final": false,
+        "progress_id": "PRG-82b97048-c4ef-4442-ac73-78851fb888dc",
+        "source_was_final": false,
+        "task_id": "T-9485410981974bfb85a5894fac35a9c1"
+      }
+    },
+    {
+      "event_id": 44,
+      "type": "computation_terminal",
+      "payload": {
+        "canonical_id": "C-9d2a5cdc302049c8b05e34839b2dca2e",
+        "staging_id": "OP-05ea4b89-9825-49cd-af46-2e8b4be330e5",
+        "state": "committed"
+      }
+    },
+    {
+      "event_id": 45,
+      "type": "progress_received",
+      "payload": {
+        "interrupted_salvage": true,
+        "is_final": false,
+        "progress_id": "PRG-9de81c11-6ea9-4180-ab71-699a201a928b",
+        "source_was_final": true,
+        "task_id": "T-9485410981974bfb85a5894fac35a9c1"
+      }
+    },
+    {
+      "event_id": 46,
+      "type": "task_transition",
+      "payload": {
+        "from": "running",
+        "task_id": "T-9485410981974bfb85a5894fac35a9c1",
+        "to": "retry_pending"
+      }
+    },
+    {
+      "event_id": 47,
+      "type": "worker_interrupted",
+      "payload": {
+        "reason": "normal_exit_missing_final_record_progress: unknown completion evidence IDs: ['OP-05ea4b89-9825-49cd-af46-2e8b4be330e5']",
+        "task_id": "T-9485410981974bfb85a5894fac35a9c1"
+      }
+    },
+    {
+      "event_id": 62,
+      "type": "progress_received",
+      "payload": {
+        "interrupted_salvage": false,
+        "is_final": false,
+        "progress_id": "PRG-f7426690-1908-4a46-8a87-d854cb496167",
+        "source_was_final": false,
+        "task_id": "T-8f64d69ca31b4eba8173e691f5df2949"
+      }
+    },
+    {
+      "event_id": 95,
+      "type": "synthesizer_resolution_received",
+      "payload": {
+        "operation_id": "OP-OBL-1b418cfd9d20468d9a9ea2e11d4cb2fe",
+        "resolution": "new"
+      }
+    },
+    {
+      "event_id": 96,
+      "type": "operation_rejected",
+      "payload": {
+        "error": "relations[0] must have at least one premise",
+        "operation_id": "OP-OBL-1b418cfd9d20468d9a9ea2e11d4cb2fe"
+      }
+    },
+    {
+      "event_id": 102,
+      "type": "synthesizer_resolution_received",
+      "payload": {
+        "operation_id": "OP-OBL-ccefe11e756d41d09686918845312b8b",
+        "resolution": "new"
+      }
+    },
+    {
+      "event_id": 103,
+      "type": "operation_rejected",
+      "payload": {
+        "error": "temporary target was rejected: PROP-OBL-86003642632d4bc083c6cbb68cd8a7f9",
+        "operation_id": "OP-OBL-ccefe11e756d41d09686918845312b8b"
+      }
+    },
+    {
+      "event_id": 109,
+      "type": "synthesizer_resolution_received",
+      "payload": {
+        "operation_id": "OP-ROUTE-0f96dc2408204852adbf15f837c31edf",
+        "resolution": "new"
+      }
+    },
+    {
+      "event_id": 110,
+      "type": "operation_rejected",
+      "payload": {
+        "error": "temporary target was rejected: PROP-OBL-86003642632d4bc083c6cbb68cd8a7f9",
+        "operation_id": "OP-ROUTE-0f96dc2408204852adbf15f837c31edf"
+      }
+    }
+  ],
+  "persisted_bug_observations": {
+    "OP-OBL-1b418cfd9d20468d9a9ea2e11d4cb2fe": {
+      "state": "rejected",
+      "error": "relations[0] must have at least one premise"
+    },
+    "OP-OBL-ccefe11e756d41d09686918845312b8b": {
+      "state": "rejected",
+      "error": "temporary target was rejected: PROP-OBL-86003642632d4bc083c6cbb68cd8a7f9"
+    },
+    "OP-OBL-EQUIVARIANT-FLOP-001": {
+      "state": "rejected",
+      "error": "outside_task_access: temporary ID ROOT belongs to another task"
+    },
+    "OP-OBL-REDUCED-GERBE-001": {
+      "state": "rejected",
+      "error": "outside_task_access: temporary ID ROOT belongs to another task"
+    }
+  }
+}

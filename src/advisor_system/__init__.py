@@ -1,0 +1,82 @@
+"""Standalone, host-neutral Advisor subsystem."""
+
+from .assets import advisor_assets_root, selection_report_skill_root
+from .contracts import (
+    BREAKTHROUGH_FRESHNESS_SCHEMA_VERSION,
+    AdvisorContractError,
+    AdvisorCycleContext,
+    AdvisorFinalization,
+    AdvisorMemorySnapshot,
+    FeedbackChoice,
+    HumanFeedback,
+    ProblemAssignment,
+    RankedObligation,
+    SelectedSubproblem,
+    SelectionReport,
+    build_breakthrough_evidence_freshness,
+    build_problem_assignment,
+    render_problem_assignment,
+    render_selection_report_markdown,
+    validate_breakthrough_evidence_freshness,
+)
+from .interfaces import AdvisorAssignmentSink, AdvisorHost, AdvisorMemoryPort
+from .program import AdvisorAdvance, AdvisorProgram
+from .prompts import AdvisorLaunchSpec, build_launch_spec
+from .settings import (
+    AdvisorSettings,
+    AdvisorSettingsError,
+    AdvisorSettingsValidationError,
+)
+from .state import (
+    AdvisorStateError,
+    AdvisorTransition,
+    accept_selection_report,
+    begin_finalize,
+    bind_advisor_session,
+    bind_human_feedback,
+    commit_problem_assignment,
+    current_status,
+    initialize_advisor_state,
+    open_advisor_round,
+)
+
+__all__ = [
+    "BREAKTHROUGH_FRESHNESS_SCHEMA_VERSION",
+    "AdvisorAdvance",
+    "AdvisorAssignmentSink",
+    "AdvisorContractError",
+    "AdvisorCycleContext",
+    "AdvisorFinalization",
+    "AdvisorHost",
+    "AdvisorLaunchSpec",
+    "AdvisorMemoryPort",
+    "AdvisorMemorySnapshot",
+    "AdvisorProgram",
+    "AdvisorSettings",
+    "AdvisorSettingsError",
+    "AdvisorSettingsValidationError",
+    "AdvisorStateError",
+    "AdvisorTransition",
+    "FeedbackChoice",
+    "HumanFeedback",
+    "ProblemAssignment",
+    "RankedObligation",
+    "SelectedSubproblem",
+    "SelectionReport",
+    "accept_selection_report",
+    "advisor_assets_root",
+    "begin_finalize",
+    "bind_advisor_session",
+    "bind_human_feedback",
+    "build_breakthrough_evidence_freshness",
+    "build_launch_spec",
+    "build_problem_assignment",
+    "commit_problem_assignment",
+    "current_status",
+    "initialize_advisor_state",
+    "open_advisor_round",
+    "render_problem_assignment",
+    "render_selection_report_markdown",
+    "selection_report_skill_root",
+    "validate_breakthrough_evidence_freshness",
+]

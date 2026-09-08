@@ -1,0 +1,235 @@
+{
+  "observation_scope": {
+    "skills": true
+  },
+  "scheduler": {
+    "schema_version": 1,
+    "gate": "completed",
+    "limits": {
+      "max_non_verifier_workers": 4,
+      "max_parallel_verifiers": 2
+    },
+    "root": {
+      "solution_fact_id": "F-root",
+      "outcome": "proved",
+      "obligation_status": "resolved",
+      "terminal_main_decision_done": true,
+      "conflicts": []
+    },
+    "events": [
+      {
+        "event_id": 1,
+        "type": "task_launch_intent_committed",
+        "payload": {"task_id": "T-repair"}
+      },
+      {
+        "event_id": 2,
+        "type": "task_launch_intent_committed",
+        "payload": {"task_id": "T-isolated"}
+      },
+      {
+        "event_id": 3,
+        "type": "call_lease_fenced",
+        "payload": {"call_id": "CALL-main", "old_epoch": 1, "new_epoch": 2}
+      },
+      {
+        "event_id": 4,
+        "type": "stale_call_output_rejected",
+        "payload": {"call_id": "CALL-main", "lease_epoch": 1}
+      },
+      {
+        "event_id": 5,
+        "type": "root_resolution_first",
+        "payload": {"fact_id": "F-root", "outcome": "proved", "operation_id": "fact-v2"}
+      },
+      {
+        "event_id": 6,
+        "type": "gate_transition",
+        "payload": {"from": "open", "to": "resolution_pending"}
+      },
+      {
+        "event_id": 7,
+        "type": "terminal_main_decision",
+        "payload": {"proof_writer_task_id": null}
+      },
+      {
+        "event_id": 8,
+        "type": "gate_transition",
+        "payload": {"from": "resolution_pending", "to": "completed"}
+      },
+      {
+        "event_id": 9,
+        "type": "project_completed",
+        "payload": {"fact_id": "F-root", "outcome": "proved"}
+      }
+    ],
+    "calls": {
+      "CALL-main": {
+        "call_id": "CALL-main",
+        "kind": "main",
+        "status": "committed",
+        "lease_epoch": 2,
+        "fenced_epochs": [1],
+        "continuation": {}
+      }
+    },
+    "tasks": {
+      "T-repair": {
+        "task_id": "T-repair",
+        "state": "closed",
+        "slot_reserved": false,
+        "assign_record": {"report_id": "AR-repair", "mode": "research"},
+        "task_card": {
+          "mode": "research",
+          "access_policy": {"project_memory_api": true, "internal_search": true}
+        },
+        "attempts": [
+          {"attempt": 1, "state": "ended_for_verifier_revision", "final_progress_id": "P-repair-1"},
+          {
+            "attempt": 2,
+            "state": "ended",
+            "kind": "verifier_revision",
+            "supplement": {"kind": "verifier_revision", "revision_request": 1},
+            "final_progress_id": "P-repair-2"
+          }
+        ]
+      },
+      "T-isolated": {
+        "task_id": "T-isolated",
+        "state": "closed",
+        "slot_reserved": false,
+        "assign_record": {"report_id": "AR-isolated", "mode": "brainstorm"},
+        "task_card": {
+          "mode": "brainstorm",
+          "access_policy": {
+            "canonical_memory": false,
+            "internal_search": false,
+            "sealed_workspace": true,
+            "direct_canonical_mount": false
+          }
+        },
+        "attempts": [
+          {"attempt": 1, "state": "ended", "final_progress_id": "P-isolated-1"}
+        ]
+      }
+    },
+    "fact_lineages": {
+      "FC-root": {
+        "candidate_id": "FC-root",
+        "task_id": "T-repair",
+        "versions": {"1": "fact-v1", "2": "fact-v2"},
+        "revision_requests": 1,
+        "rejected_bundle_digests": ["digest-v1"],
+        "concession_required": false,
+        "closed": true
+      }
+    },
+    "operations": {
+      "fact-v1": {
+        "operation_id": "fact-v1",
+        "task_id": "T-repair",
+        "kind": "fact",
+        "state": "rejected",
+        "verifier_report": {"verdict": "incorrect", "bundle_digest": "digest-v1"}
+      },
+      "fact-v2": {
+        "operation_id": "fact-v2",
+        "task_id": "T-repair",
+        "kind": "fact",
+        "state": "committed",
+        "canonical_id": "F-root",
+        "verified_correct": true
+      }
+    },
+    "trim": {
+      "active_review": null,
+      "active_trim": null,
+      "last_trim": {"round": 2}
+    }
+  },
+  "categories": {
+    "categories": {
+      "CAT-1": {
+        "id": "CAT-1",
+        "status": "active",
+        "revision": 2,
+        "members": {"fact": ["F-root"], "route": [], "memo": [], "claim": [], "obligation": []}
+      }
+    },
+    "category_history": {
+      "CAT-1": [
+        {
+          "id": "CAT-1",
+          "status": "active",
+          "revision": 1,
+          "members": {"fact": [], "route": [], "memo": [], "claim": [], "obligation": []}
+        }
+      ]
+    },
+    "events": []
+  },
+  "memories": [
+    {
+      "id": "F-root",
+      "type": "fact",
+      "active": true,
+      "abstract": "The root statement follows from the repaired boundary argument.",
+      "statement": "ROOT holds.",
+      "proof": "The repaired boundary argument proves ROOT.",
+      "originating_task_id": "T-repair",
+      "foundation_policy_version": 1
+    }
+  ],
+  "skill_activity": [
+    {"skill": "task-writing", "role": "main", "artifact": {"task_id": "T-repair", "report_id": "AR-repair"}},
+    {"skill": "task-writing", "role": "main", "artifact": {"task_id": "T-isolated", "report_id": "AR-isolated"}},
+    {"skill": "record-progress", "role": "worker", "mode": "research", "artifact": {"task_id": "T-repair", "attempt": 1, "final": true}},
+    {"skill": "record-progress", "role": "worker", "mode": "research", "artifact": {"task_id": "T-repair", "attempt": 2, "final": true}},
+    {"skill": "record-progress", "role": "worker", "mode": "brainstorm", "artifact": {"task_id": "T-isolated", "attempt": 1, "final": true}}
+  ],
+  "read_audit": [
+    {
+      "audit_seq": 1,
+      "action": "search",
+      "actor": "CALL-main",
+      "result_ids": ["F-root"],
+      "allowed": true
+    },
+    {
+      "audit_seq": 2,
+      "action": "fetch",
+      "actor": "CALL-main",
+      "subject_id": "F-root",
+      "allowed": true
+    }
+  ],
+  "live_events": [
+    {
+      "type": "memory_health_review",
+      "verdict": "healthy",
+      "rationale": "The established fact is central and fully proved; small observations remain nonauthoritative."
+    },
+    {
+      "type": "category_balance_review",
+      "verdict": "unbalanced",
+      "rationale": "The prior category hid the repaired boundary direction."
+    },
+    {
+      "type": "category_redraw",
+      "category_id": "CAT-1",
+      "reason": "Expose the repaired boundary direction."
+    },
+    {
+      "type": "transport.call_started",
+      "call_id": "CALL-main",
+      "role": "main",
+      "resumed": true
+    },
+    {
+      "type": "thread_binding",
+      "call_id": "CALL-main",
+      "thread_id": "thread-1",
+      "role": "main"
+    }
+  ]
+}

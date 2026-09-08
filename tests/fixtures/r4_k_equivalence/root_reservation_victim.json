@@ -1,0 +1,99 @@
+{
+  "attempt": 1,
+  "computation_operation_ids": [
+    "COMP-DESCENT-COCYCLE-001"
+  ],
+  "fact_challenges": [],
+  "is_final": false,
+  "operation_id": "OP-21f363e3-d075-42c2-ac79-6f1e8be63375",
+  "operations": [
+    {
+      "abstract": "Descent obstruction route for K-equivalent complex varieties: twist a crepant Calabi–Yau fiber pair over a rigid canonically polarized base so a nonneutral Fourier–Mukai equivalence gerbe obstructs the generic fiber and hence the total-space derived equivalence.",
+      "active_fact_ids": [],
+      "kind": "route_add",
+      "next_steps": "Find a projective Calabi–Yau flop with a finite G-action for which the nonequivariant equivalence kernel is simple, its equivariant structures have the displayed nonzero multiplier, and all possible equivalences lie in that obstructed component. Then realize the multiplier on a free G-quotient base with ample K and trivial automorphisms.",
+      "obstacles": "Known flop equivalences often have canonical structure-sheaf or window kernels carrying honest equivariant structures, so their descent gerbes are neutral. Ruling out alternative equivariant kernels is essential and cannot be replaced by merely exhibiting one obstructed kernel.",
+      "operation_id": "OP-ROUTE-DESCENT-001",
+      "progress": "A canonical-base lemma shows that for smooth projective Calabi–Yau fibrations over a rigid canonically polarized S, an absolute equivalence restricts to a C(S)-linear generic-fiber equivalence. A gerbe lemma identifies the exact H^2(S,G_m) obstruction to gluing a locally unique simple kernel. For G=(Z/3)^2 the normalized multiplier c((a,b),(a',b'))=zeta^(ab') was rigorously shown nontrivial; a complete finite CAS check is staged.",
+      "proposal_id": "PROP-ROUTE-DESCENT-001",
+      "related_obligation_ids": [
+        "PROP-OBL-EQUIVARIANT-FLOP-001"
+      ],
+      "relevant_claim_ids": [
+        "PROP-CLAIM-CANONICAL-BASE-001",
+        "PROP-CLAIM-KERNEL-GERBE-001",
+        "PROP-CLAIM-SIMPLE-TORSION-001"
+      ],
+      "relevant_memo_ids": [],
+      "strategy_description": "Start with a finite group acting on a smooth projective crepant birational fiber pair and on a common resolution. Seek a local Fourier–Mukai equivalence component that is only projectively equivariant, with nonzero multiplier in H^2(G,C^*), and prove that no other equivariant equivalence exists. Twist by a free G-cover of a smooth projective base S with ample canonical bundle and trivial automorphism group. The descended total spaces are smooth, projective, and K-equivalent. Their canonical model is S, so any absolute derived equivalence is fiberwise and restricts to the generic fiber; the nonneutral descent gerbe then forbids it.",
+      "value_assessment": {
+        "confidence": "The local-to-global and canonical-model reductions are rigorous; the unresolved point is realizing and exhausting an obstructed equivalence component for a concrete crepant pair.",
+        "failure_gain": "Proving every crepant equivalence admits equivariant descent would expose a strong new rigidity principle supporting the conjecture.",
+        "novelty": "It imports arithmetic/descent failure over C(S) and amplifies it to an absolute complex counterexample via the canonical model.",
+        "relevance": "It targets full untwisted derived equivalence, precisely where twisted or fiberwise equivalences can fail while K-equivalence descends geometrically.",
+        "success_gain": "A concrete realization immediately gives a genuine counterexample satisfying all four requirements of the root problem."
+      }
+    },
+    {
+      "abstract": "Canonical-base generic-fiber lemma: an equivalence between smooth projective relative-Calabi–Yau families over a canonically polarized base with no automorphisms induces a derived equivalence of their C(S)-generic fibers.",
+      "content": "Claim. Let S be a smooth projective complex variety with K_S ample and Aut(S)=1. Let p:X→S and q:Y→S be smooth projective morphisms with geometrically connected fibers, with X and Y smooth projective and ω_{X/S}≅O_X, ω_{Y/S}≅O_Y. If D^bCoh(X)≃D^bCoh(Y), then the generic fibers X_η and Y_η over K=C(S) have a K-linear exact derived equivalence.\n\nProof. Connected fibers give p_*O_X=q_*O_Y=O_S. Since ω_X≅p^*ω_S and ω_Y≅q^*ω_S, projection formula gives R(X,K_X)=⊕_{m≥0}H^0(X,ω_X^m)=⊕_{m≥0}H^0(S,ω_S^m)=R(S,K_S), and similarly for Y. An exact equivalence is Fourier–Mukai by Orlov representability and intertwines Serre functors. Therefore it identifies the graded canonical rings: a section s of ω_X^m is the natural transformation id→(-⊗ω_X^m), and conjugation by the equivalence sends it to the corresponding transformation for Y. Taking Proj gives an automorphism of S; it is the identity because Aut(S)=1.\n\nLet P be a Fourier–Mukai kernel. The compatibility of the kernel with the canonical-ring action implies that on P, multiplication by p_X^*s agrees with multiplication by p_Y^*s for every pluricanonical section (after the canonical-ring identification). If (x,y) lies in Supp(P) and p(x)≠q(y), ampleness of K_S supplies, for some m, a section vanishing at p(x) but not at q(y). At the local stalk of a nonzero cohomology sheaf of P, multiplication by the first pullback is noninvertible by Nakayama while multiplication by the second is invertible, a contradiction. Hence Supp(P)⊂X×_S Y. The inverse kernel has the analogous support. The two convolution identities giving the diagonal kernels base-change to η, so P|_{X_η×_K Y_η} and the restricted inverse kernel yield mutually inverse K-linear equivalences.\n\nExternal input: Orlov representability as recorded in Y. Kawamata, D-equivalence and K-equivalence, J. Differential Geom. 61 (2002), Theorem 2.2, arXiv:math/0205287; the rest is the argument above.",
+      "kind": "claim_add",
+      "operation_id": "OP-CLAIM-CANONICAL-BASE-001",
+      "proposal_id": "PROP-CLAIM-CANONICAL-BASE-001",
+      "related_route_ids": [
+        "PROP-ROUTE-DESCENT-001"
+      ]
+    },
+    {
+      "abstract": "Fourier–Mukai kernel descent lemma: locally isomorphic simple equivalence kernels form a G_m-gerbe, and its H^2 class is exactly the obstruction to an untwisted global kernel in that component.",
+      "content": "Claim. Let T be a scheme, U→T an fpqc cover, and X,Y smooth proper T-schemes. Suppose a chosen component of relative equivalence kernels is locally represented by perfect complexes P_i on X_{U_i}×_{U_i}Y_{U_i}; assume every P_i is simple, so its automorphism sheaf is G_m, and the P_i are locally isomorphic on double overlaps. Then choices φ_{ij}:P_j→P_i on double overlaps give scalars c_{ijk}=φ_{ij}φ_{jk}φ_{ki} on triple overlaps. Their class β in H^2(T,G_m) is independent of choices. This component contains an untwisted global kernel if and only if β=0; when β is nonzero it instead has a β-twisted kernel. Consequently, if every T-linear equivalence belongs to this component and β≠0, there is no untwisted T-linear derived equivalence.\n\nProof. Simplicity makes each triple composite a unique unit, and associativity gives the Čech 2-cocycle identity. Replacing φ_{ij} by units changes c by a coboundary. If β=0, rescale the φ_{ij} to satisfy the strict cocycle condition and apply fpqc descent for perfect complexes; conversely, descent isomorphisms of a global complex have c=1. The same descent data with nontrivial c are precisely twisted-complex data on the G_m-gerbe of class β. A global relative kernel inducing an equivalence would be an object of the equivalence-kernel gerbe, so under the exhaustion hypothesis its existence would neutralize β.",
+      "kind": "claim_add",
+      "operation_id": "OP-CLAIM-KERNEL-GERBE-001",
+      "proposal_id": "PROP-CLAIM-KERNEL-GERBE-001",
+      "related_route_ids": [
+        "PROP-ROUTE-DESCENT-001"
+      ]
+    },
+    {
+      "abstract": "Simple K-equivalence torsion lemma: for two codimension-r blowdowns of one exceptional divisor, the differences of the categorical Grothendieck classes of the ambient varieties and centers coincide and are r-torsion.",
+      "content": "Claim. Let f:Z=Bl_A(X)→X and g:Z=Bl_B(Y)→Y be blowups of smooth projective complex varieties along smooth centers A,B of the same codimension r≥2, and suppose their exceptional divisor is the same divisor E⊂Z. In the Bondal–Larsen–Lunts Grothendieck group PT(C) of smooth proper dg categories, write [V]=[Perf(V)]. Then [X]-[Y]=[A]-[B] and r([X]-[Y])=0.\n\nProof. Orlov's blowup formula gives [Z]=[X]+(r-1)[A]=[Y]+(r-1)[B]. The projective-bundle formula applied to E=P_A(N_{A/X})=P_B(N_{B/Y}) gives [E]=r[A]=r[B]. Put δ=[A]-[B] and ε=[X]-[Y]. The first relation gives ε=-(r-1)δ, while the second gives rδ=0. Hence ε=δ-rδ=δ and rε=0. Thus any obstruction factoring through PT(C) and landing in an r-torsion-free group is automatically blind to such a simple K-equivalence; a PT-based counterexample must detect a nonzero r-torsion center class. If [A]≠[B] in PT(C), then [X]≠[Y], which itself rules out derived equivalence.\n\nExternal inputs: D. Orlov, Projective bundles, monoidal transformations, and derived categories of coherent sheaves, Russian Acad. Sci. Izv. Math. 41 (1993), Theorems 2.6 and 4.3; A. Bondal, M. Larsen, V. Lunts, Grothendieck ring of pretriangulated categories, Int. Math. Res. Not. 2004 no. 29, 1461–1495, arXiv:math/0401009.",
+      "kind": "claim_add",
+      "operation_id": "OP-CLAIM-SIMPLE-TORSION-001",
+      "proposal_id": "PROP-CLAIM-SIMPLE-TORSION-001",
+      "related_route_ids": [
+        "PROP-ROUTE-DESCENT-001"
+      ]
+    },
+    {
+      "abstract": "Construct or rule out a finite-group crepant fiber pair whose Fourier–Mukai equivalence gerbe has a nonzero projective multiplier and no neutral alternative component.",
+      "importance": "A positive construction, after forming (T×V_+)/G and (T×V_-)/G, would disprove the root statement; a general negative theorem would eliminate a broad arithmetic-descent counterexample mechanism.",
+      "kind": "obligation_add",
+      "operation_id": "OP-OBL-EQUIVARIANT-FLOP-001",
+      "partial_progress": "The canonical-model reduction and kernel-gerbe criterion are proved as claims. The explicit multiplier c((a,b),(a',b'))=zeta^(ab') for G=(Z/3)^2 is normalized, satisfies every cocycle identity, and is nontrivial because its commutator on the standard basis is zeta; the finite verification is staged reproducibly. Known standard-flop kernels appear canonically equivariant, so a nonstandard higher-dimensional flop is the plausible search locus.",
+      "predecessor_fact_ids": [],
+      "proposal_id": "PROP-OBL-EQUIVARIANT-FLOP-001",
+      "related_route_ids": [
+        "PROP-ROUTE-DESCENT-001"
+      ],
+      "relations": [
+        {
+          "conclusion": "ROOT",
+          "explanation": "The quotient total spaces are smooth and projective because the action is free on T, their common equivariant resolution descends and proves K-equivalence, while any absolute derived equivalence would restrict to a generic-fiber kernel and neutralize the stipulated nonzero gerbe.",
+          "premise_memory_ids": [
+            "PROP-CLAIM-CANONICAL-BASE-001",
+            "PROP-CLAIM-KERNEL-GERBE-001"
+          ],
+          "relation_type": "conditional_disproof_route",
+          "supporting_fact_ids": []
+        }
+      ],
+      "statement": "Find a finite group G, a smooth projective Calabi–Yau crepant birational pair V_+,V_- with a G-equivariant smooth projective common resolution, and a G-invariant volume form, such that: (i) V_+ and V_- are ordinarily derived equivalent; (ii) every Fourier–Mukai equivalence lies in components whose G-equivariant kernel gerbes have nonzero class in H^2(G,C^*); and (iii) some free G-cover T→S of a smooth projective S with K_S ample and Aut(S)=1 sends one such class to a nonzero element of Br(S). Equivalently, prove that no such data can exist by constructing an honest G-linearization on at least one equivalence kernel for every equivariant crepant pair."
+    }
+  ],
+  "outcome_status": "progress",
+  "progress_id": "PRG-0fc4a42e-7230-44d0-980b-8d1df2522078",
+  "progress_since_previous": "Developed a descent-obstruction route that can turn failure of equivariant Fourier–Mukai descent on a crepant fiber into an actual complex K-equivalent/non-derived-equivalent pair. Proved the canonical-model generic-fiber reduction, the scalar-gerbe obstruction criterion, and an additive-torsion lemma for simple K-equivalences. Staged an explicit nontrivial (Z/3)^2 multiplier computation.",
+  "sequence": 1,
+  "skill": "record-progress",
+  "task_id": "T-8f64d69ca31b4eba8173e691f5df2949"
+}

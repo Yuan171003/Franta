@@ -1,0 +1,20 @@
+include README.md README.zh-CN.md LICENSE
+include Design.md IMPLEMENTATION.md pyproject.toml setup.py MANIFEST.in .gitignore .gitattributes
+recursive-include .agents/skills *.md
+recursive-include .github/workflows *.yml
+recursive-include bin *
+recursive-include examples *.toml *.md
+recursive-include evals *.py *.json *.md
+recursive-include scripts *.py
+recursive-include docs *.md
+recursive-include tests *.py *.json *.md *.toml
+recursive-include src *.py *.md *.html *.css *.js *.txt *.woff2
+prune long_tests
+prune release
+prune dist
+prune build
+prune .venv
+prune .pytest_cache
+prune .git
+global-exclude .DS_Store *.py[cod] *.sqlite3 *.sqlite3-* *.db *.db-* .env .env.*
+global-exclude *.pem *.key

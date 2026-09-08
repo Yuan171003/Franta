@@ -1,0 +1,82 @@
+[project]
+name = "example-research-project"
+directory = "../example-project"
+root_problem_file = "root-problem.md"
+foundation_policy_file = "foundation.md"
+
+# Main, trimmer, verifier, challenge-verifier, and closure-review calls.
+# Worker routes, including discovery-sprint lanes and its summarizer, are fixed at astra/max.
+[models.default]
+model = "gpt-6-astra"
+reasoning_effort = "ultra"
+
+[models.synthesizer]
+model = "gpt-6-astra"
+reasoning_effort = "xhigh"
+
+[retries]
+worker_interruptions = 3
+verifier_transport = 3
+synthesizer_transport = 3
+summarizer_transport = 3
+main_transport = 3
+trimmer_transport = 3
+
+# Worker calls always have a four-hour (14400-second) watchdog. This optional
+# default controls other Codex calls and confined CAS/Tectonic subprocesses;
+# omit it to leave those deadlines unset.
+[timeouts]
+# agent_call_seconds = 3600
+
+[limits]
+max_non_verifier_workers = 4
+max_parallel_verifiers = 2
+max_portfolio_memories = 20
+max_search_results = 10
+worker_resume_launches = 6
+verifier_revision_requests = 2
+assignments_per_trim_review = 8
+trimmer_rounds_per_session = 3
+
+[context_budgets]
+main_portfolio_tokens = 60000
+worker_portfolio_tokens = 40000
+summarizer_input_tokens = 60000
+
+[tools]
+codex = "codex"
+# Optional tools: uncomment only those installed on PATH, or use a path relative
+# to this manifest (absolute paths and ~/... are also accepted).
+# sage = "sage"
+# macaulay2 = "M2"
+# tectonic = "tectonic"
+
+[tools.extra_cas]
+
+[agents]
+native_web_search = true
+
+# Explorer/Franta alternation is strictly opt-in. Uncomment the whole table for
+# up to four concurrent max-reasoning Explorer lineages, 3 attempts x 3
+# hours per lineage, a 2-hour Explorer admission window, then a selective
+# sort and 8-hour Franta window.
+# [explorer]
+# enabled = true
+# max_workers = 4
+# attempts_per_worker = 3
+# attempt_seconds = 10800
+# explorer_admission_seconds = 7200
+# franta_admission_seconds = 28800
+# max_scratch_per_attempt = 256
+# max_scratch_per_turn = 4096
+# max_abstract_bytes = 4096
+# max_content_bytes = 262144
+
+# Advisor is separately opt-in and requires the [explorer] table above. After
+# each Franta turn it proposes five ranked obligations, waits for human
+# selection, and gives the selected one or two subproblems to the next
+# Explorer/Franta turn. The table is intentionally otherwise fixed.
+# [advisor]
+# enabled = true
+
+[initial]

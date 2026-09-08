@@ -1,0 +1,66 @@
+{
+  "attempt": 1,
+  "computation_operation_ids": [],
+  "fact_challenges": [],
+  "is_final": false,
+  "operation_id": "OP-a5a0d8fe-bc50-4f82-a15d-abe33d75f809",
+  "operations": [
+    {
+      "abstract": "Projective Mukai flops of dimension 2m (m>=2) are smooth projective K-equivalences for which push-pull along the smooth common blowup is not fully faithful, although a reducible fiber-product kernel yields derived equivalence.",
+      "candidate_id": "CAND-91cd8659e94843bdab636be7ef51b088",
+      "candidate_version": 1,
+      "external_references": [
+        {
+          "authors": "Yujiro Kawamata",
+          "exact_result": "Example 5.2(2) constructs the smooth projective Mukai flop and its common resolution; Corollary 5.7 gives an equivalence from the reducible correspondence kernel; Proposition 5.12 proves that Rg_{0*}Lf_0^* is not an equivalence for m>=2 by an explicit self-Ext calculation.",
+          "locator": "Journal of Differential Geometry 61 (2002), Example 5.2(2), Corollary 5.7, Proposition 5.12, pp. 157-164",
+          "role": "Supplies the geometric family and the decisive categorical computation; the blowup canonical-divisor calculation is reproduced in the proof.",
+          "source_type": "journal article",
+          "stable_identifier_or_url": "https://doi.org/10.4310/jdg/1090351323",
+          "title": "D-equivalence and K-equivalence"
+        }
+      ],
+      "foundation_policy_version": 1,
+      "introduced_notation": [
+        {
+          "definition": "Kawamata's smooth projective Mukai flop obtained as a general hypersurface section of a projective standard flop.",
+          "scope": "This fact only.",
+          "symbol": "X_0 \\dashrightarrow Y_0"
+        },
+        {
+          "definition": "The smooth common blowup of the two Mukai-flop centers.",
+          "scope": "This fact only.",
+          "symbol": "Z_0"
+        },
+        {
+          "definition": "The reducible fiber-product correspondence used by Kawamata as the successful Fourier-Mukai kernel.",
+          "scope": "This fact only.",
+          "symbol": "Z'_0"
+        }
+      ],
+      "keywords": [
+        "Mukai flop",
+        "common resolution",
+        "Fourier-Mukai kernel",
+        "push-pull",
+        "categorical descent",
+        "K-equivalence"
+      ],
+      "kind": "fact",
+      "operation_id": "OP-4d7e0834c2b94a6fb6a4e7f5adf72314",
+      "originating_task_id": "T-6319fbf653d044cd81beb63c46d286d9",
+      "predecessor_fact_ids": [],
+      "proof": "Kawamata's Example 5.2(1) starts with the projective standard flop in dimension 2m+1 whose center E is P^m with normal bundle O_{P^m}(-1)^{oplus(m+1)}. Taking a general hypersurface through the unique contraction point gives Example 5.2(2): smooth projective 2m-folds X_0,Y_0 related by a Mukai flop and a smooth common resolution Z_0, with exceptional divisor G_0 and maps f_0,g_0. Here E has codimension m in X_0 and the flopped center F has codimension m in Y_0; f_0 and g_0 are their blowups. The canonical divisor formula for a blowup of a smooth codimension-m center gives K_{Z_0}=f_0^*K_{X_0}+(m-1)G_0=g_0^*K_{Y_0}+(m-1)G_0, proving K-equivalence under the precise hypotheses of ROOT. Let Phi=Rg_{0*}Lf_0^*. Kawamata, Proposition 5.12, takes a=O_{X_0}(-m), computes H^q(Phi(a))=O_{Y_0}(m) for q=0, O_F(-1) for q=m-1, and 0 otherwise, and uses the resulting Ext spectral sequence to show that for 2<=p<=2m-2 the self-Ext groups of a and Phi(a) are not isomorphic. Thus Phi is not fully faithful. On the other hand, Kawamata, Corollary 5.7, proves that the Fourier-Mukai functor with kernel O_{Z'_0}, where Z'_0 is the reducible fiber-product correspondence inherited from the ambient standard flop, is an equivalence. Hence the failed functor cannot disprove derived equivalence, but it rigorously refutes the assertion that equality of pulled-back canonical divisors makes push-pull along an arbitrary smooth common resolution an equivalence.",
+      "proposal_id": "PROP-c81e8e5e312b420096785378eaf50b4f",
+      "related_route_ids": [],
+      "root_resolution": null,
+      "statement": "For every integer m>=2, the projective Mukai-flop construction supplies smooth projective complex varieties X_0 and Y_0 of dimension 2m and a smooth projective common resolution f_0:Z_0->X_0, g_0:Z_0->Y_0 such that f_0^*K_{X_0}=g_0^*K_{Y_0}, but the exact functor Rg_{0*} Lf_0^*:D^b Coh(X_0)->D^b Coh(Y_0) is not fully faithful (hence is not an equivalence). The same X_0 and Y_0 are nevertheless derived equivalent by a Fourier-Mukai kernel supported on the reducible fiber-product correspondence, so this is an obstruction to naive common-resolution descent and not a counterexample to K=>D."
+    }
+  ],
+  "outcome_status": "progress",
+  "progress_id": "PRG-4ee06982-7c3b-4c68-990a-91573c923d72",
+  "progress_since_previous": "Established an explicit higher-dimensional categorical-descent obstruction: in projective Mukai flops the smooth common-resolution push-pull functor can fail even to be fully faithful although a different correspondence kernel gives an untwisted equivalence.",
+  "sequence": 1,
+  "skill": "record-progress",
+  "task_id": "T-6319fbf653d044cd81beb63c46d286d9"
+}

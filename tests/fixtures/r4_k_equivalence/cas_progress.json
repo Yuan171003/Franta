@@ -1,0 +1,34 @@
+{
+  "attempt": 1,
+  "computation_operation_ids": [
+    "OP-05ea4b89-9825-49cd-af46-2e8b4be330e5"
+  ],
+  "fact_challenges": [],
+  "is_final": false,
+  "operation_id": "OP-7b6de147-ff41-4927-86cd-36e745790421",
+  "operations": [
+    {
+      "abstract": "A degree-4 K3 compactified-Picard pair gives a genuine twisted/untwisted derived near-miss, but unequal Neron-Severi discriminants prove that it is not birational and hence not K-equivalent.",
+      "content": "Let S be a very general complex projective K3 surface with Pic(S)=Z H and H^2=4, and let C -> |H| be the universal genus-3 curve. Set X=M_H(0,H,0)=\\overline{Pic}^{2}(C/|H|) and Y=M_H(0,H,1)=\\overline{Pic}^{3}(C/|H|). The Mukai vectors are primitive of square 4, so standard moduli theory for stable sheaves on a K3 surface makes X and Y smooth projective irreducible holomorphic symplectic sixfolds; in particular K_X=K_Y=0. Mattei--Meinsma, arXiv:2404.16652v2, Theorems 1.2/4.5, identifies the order of the obstruction to a universal sheaf with the Mukai-lattice divisibility. In N(S)=U plus <4>, div(0,H,0)=4 while div(0,H,1)=1, so the obstruction classes alpha_2 and alpha_3 have orders 4 and 1. Addington--Donovan--Meachan, J. Lond. Math. Soc. 93 (2016), Proposition 2.1(a), gives D^b(X,alpha_2^3) equivalent to D^b(Y); the twist alpha_2^3 is nontrivial of order 4. Nevertheless X and Y are not untwisted derived equivalent: Mattei--Meinsma, Theorem 5.17, applies directly, and its obstruction is the unequal discriminant of the algebraic part of Beckmann's extended Mukai lattice, namely 4 for X and 16 for Y; Beckmann, Compos. Math. 159 (2023), Theorem 9.2, proves that an untwisted exact derived equivalence would preserve this integral Hodge lattice. Crucially, this is not a counterexample to K-equivalence. Direct Mukai-morphism computation gives NS(X) Gram matrix [[0,-1],[-1,0]] of determinant -1 and NS(Y) Gram matrix [[0,-4],[-4,4]] of determinant -16. Birational projective irreducible symplectic manifolds have isometric integral H^2 Hodge lattices, hence isometric Neron-Severi lattices (Huybrechts, Invent. Math. 135 (1999), Corollary 4.7). Therefore X and Y are not birational, so no common birational resolution exists and they are not K-equivalent despite both canonical bundles being trivial. This eliminates this natural Brauer-twist mechanism: twisted equivalence plus failure of untwisted equivalence can occur, but in this explicit family the necessary birationality checkpoint fails.",
+      "kind": "claim_add",
+      "operation_id": "OP-9bfba57c-b8d6-49b5-9362-0a31267b7419",
+      "proposal_id": "PROP-CLAIM-a23ce10a-9796-4554-ad0e-d9e05d1fe4a4",
+      "related_route_ids": []
+    },
+    {
+      "abstract": "Counterexample search update: K3^[n]-type twisted candidates are closed off; generalized Kummer and O'Grady types remain more plausible stress-test pools.",
+      "content": "The root statement is exactly Kawamata's D/K-equivalence conjecture and remains open in full dimension, as recorded in active memo M-21853103147c48109c5dc4d16f83df43. The quartic-K3 compactified-Picard computation shows why a twisted Fourier--Mukai equivalence cannot be treated as evidence for a counterexample until birationality is checked: the pair has K=0 and genuine untwisted derived inequivalence, yet its NS discriminants differ and it is not birational. Moreover, Maulik--Shen--Yin--Zhang, Invent. Math. (2025), DOI 10.1007/s00222-025-01339-8, prove that all birational hyperkahler varieties of K3^[n]-type are derived equivalent, so no K-equivalent counterexample can come from that deformation type. A remaining systematic disproof search should instead examine generalized Kummer and O'Grady deformation types (or high-dimensional non-toroidal flops), enforcing four separate gates: smooth projective models, actual birationality/common resolution, crepantness, and an invariant of the full untwisted category. Yang, arXiv:2510.16279, supplies a new derived-invariant integral lattice for generalized Kummer varieties that could be computed on explicit birational wall-crossing models, but currently gives no counterexample and no general D-equivalence theorem.",
+      "genre": "normal",
+      "kind": "memo",
+      "operation_id": "OP-4512b22d-22bd-4566-be05-0db9ce78bd54",
+      "proposal_id": "PROP-MEMO-79d368ee-f4bc-4f84-ad6e-a15ba0217fe2",
+      "related_route_ids": []
+    }
+  ],
+  "outcome_status": "progress",
+  "progress_id": "PRG-82b97048-c4ef-4442-ac73-78851fb888dc",
+  "progress_since_previous": "Constructed and rigorously rejected a concrete Brauer-twisted compactified-Picard near-counterexample, with exact lattice computations staged reproducibly; narrowed the remaining counterexample search away from K3^[n]-type hyperkähler varieties.",
+  "sequence": 1,
+  "skill": "record-progress",
+  "task_id": "T-9485410981974bfb85a5894fac35a9c1"
+}

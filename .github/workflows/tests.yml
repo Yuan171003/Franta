@@ -1,0 +1,66 @@
+name: Tests and distributions
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ['3.11', '3.12', '3.13', '3.14']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install from the checkout
+        run: python -m pip install -e .
+      - name: Run the complete offline suite
+        run: python -m unittest discover -s tests -v
+
+  linux-confinement:
+    runs-on: ubuntu-22.04
+    env:
+      FRANTA_RUN_CONFINEMENT_INTEGRATION: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install bubblewrap and Franta
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes bubblewrap
+          python -m pip install -e .
+      - name: Exercise real Linux process confinement with Python
+        run: |
+          python -m unittest discover -s tests -p test_release_portability.py -v
+          python -m unittest discover -s tests -p test_skill_mcp_exposure.py -v
+
+  distributions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install build tools
+        run: python -m pip install build twine
+      - name: Build the source archive and a wheel from that archive
+        run: python -m build
+      - name: Validate metadata and installed resources
+        run: |
+          python -m twine check dist/*
+          python scripts/check_distribution.py dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/*

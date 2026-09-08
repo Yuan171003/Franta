@@ -1,0 +1,121 @@
+{
+  "attempt": 1,
+  "computation_operation_ids": [],
+  "fact_challenges": [],
+  "is_final": false,
+  "operation_id": "OP-ee1af747-4722-4ba1-a40b-9d1b2791e5ea",
+  "operations": [
+    {
+      "abstract": "A crepant birational map between smooth projective varieties is an isomorphism in codimension one by equality of discrepancy supports.",
+      "content": "Let X and Y be smooth projective and K-equivalent through a fixed birational correspondence. Then the induced birational map X dashrightarrow Y is an isomorphism in codimension one. Indeed, after choosing canonical divisors from the rational top forms identified by the birational map, crepancy says that the two relative canonical divisors on a common smooth model coincide. For a birational morphism to a smooth (hence terminal) target, a prime divisor occurs in the relative canonical divisor with positive coefficient exactly when it is exceptional. Thus the two morphisms have the same exceptional prime divisors, so neither direction contracts a divisor. This is also Kawamata, D-equivalence and K-equivalence, J. Differential Geom. 61 (2002), Lemma 4.2, DOI 10.4310/jdg/1090351323.",
+      "kind": "claim_add",
+      "operation_id": "OP-CLAIM-6c80c95c1d1643b8ad2ba9a70cac543b",
+      "proposal_id": "PROP-CLAIM-cbe58fc2d92049c986033ebffb77d8e6",
+      "related_route_ids": [
+        "PROP-ROUTE-40d55581b07c4fbf8d42a0d5f191a363"
+      ]
+    },
+    {
+      "abstract": "No non-isomorphic birational morphism between smooth projective varieties is crepant, so weak factorization cannot be termwise crepant.",
+      "content": "Let h:V->W be a birational morphism between smooth connected projective varieties. The determinant of the differential is a section of omega_V tensor h^*omega_W^{-1}; its zero divisor R is effective and K_V=h^*K_W+R. If K_V is linearly equivalent to h^*K_W, then R is an effective linearly trivial divisor. A nonzero effective divisor cannot be linearly trivial on a connected projective variety: under a trivialization its canonical section would be a nonconstant global regular function. Hence R=0. The differential then has full rank everywhere, so h is etale; being proper and birational, h is finite birational onto the normal variety W and therefore an isomorphism. In particular, every nontrivial blowup of a smooth codimension-c center has K_{Bl_C W}=h^*K_W+(c-1)E with c>=2, so every nontrivial morphism in a smooth weak factorization changes K rather than preserving it.",
+      "kind": "claim_add",
+      "operation_id": "OP-CLAIM-8bd57f94bbbd4f5eaaf4031feb6e8b9b",
+      "proposal_id": "PROP-CLAIM-7f6ad5fbd2b04cb4b2bc899c4e06fc79",
+      "related_route_ids": [
+        "PROP-ROUTE-40d55581b07c4fbf8d42a0d5f191a363"
+      ]
+    },
+    {
+      "abstract": "Audit K-equivalence by separating small crepant factorization from categorical kernels: use MMP flops where available and stress-test descent on explicit higher-dimensional flops.",
+      "active_fact_ids": [],
+      "kind": "route_add",
+      "next_steps": "Either add a hypothesis such as K-nef and build a categorical theory for every resulting terminal flop, or attack unrestricted flop factorization. For counterexamples, compute enhanced derived invariants on explicit higher-dimensional crepant flops rather than relying on Hodge or motivic equalities.",
+      "obstacles": "General flop factorization without nefness is conjectural; MMP intermediates need not be smooth; arbitrary higher-dimensional flops are not known to preserve ordinary untwisted derived categories; local equivalences and noncommutative models need not globalize; the obvious smooth-resolution kernel is false in Mukai examples.",
+      "operation_id": "OP-ROUTE-0f96dc2408204852adbf15f837c31edf",
+      "progress": "The induced map is small. Smooth weak-factorization steps cannot be crepant unless trivial. Kawamata's flop-factorization theorem applies when K (or K+B) is nef, while unrestricted projective Q-factorial terminal K-equivalence is stated as a conjecture. The projective Mukai-flop computation shows that Rg_*Lf^* along the smooth common blowup can fail to be fully faithful.",
+      "proposal_id": "PROP-ROUTE-40d55581b07c4fbf8d42a0d5f191a363",
+      "related_obligation_ids": [
+        "PROP-OBL-86003642632d4bc083c6cbb68cd8a7f9",
+        "PROP-OBL-acde30243ac34a0f93f99b209b160f65"
+      ],
+      "relevant_claim_ids": [
+        "PROP-CLAIM-cbe58fc2d92049c986033ebffb77d8e6",
+        "PROP-CLAIM-7f6ad5fbd2b04cb4b2bc899c4e06fc79"
+      ],
+      "relevant_memo_ids": [
+        "PROP-MEMO-6b6fe0aa8f404257868870c6bf15acc6"
+      ],
+      "strategy_description": "Start from discrepancy equality to reduce a smooth projective K-equivalence to a small crepant birational map. Keep two logically independent gates: first obtain a finite factorization by projective flops under exactly the original hypotheses; second attach compatible full untwisted equivalences to every elementary step, including any singular intermediate model. Use weak factorization only to derive semiorthogonal or motivic identities, since its blowups are not crepant. Test candidate Fourier-Mukai kernels on explicit standard, Mukai, stratified, and homogeneous flops; replace the smooth-common-resolution kernel by a derived fiber product, window, mutation, or noncommutative model when computations demand it. A counterexample search should target an invariant of enhanced derived categories not already forced by crepant birational geometry.",
+      "value_assessment": {
+        "confidence": "High confidence in the identified logical gates and obstructions; low confidence that either unrestricted gate is currently provable.",
+        "failure_gain": "A failed kernel or a failure of flop factorization sharply rules out a common but invalid proof architecture.",
+        "novelty": "Combines discrepancy bookkeeping with an explicit Mukai-flop self-Ext obstruction to enforce kernel-level correctness.",
+        "relevance": "Directly addresses the assigned common-resolution, MMP, flop, and categorical-descent bridge.",
+        "success_gain": "A proof of both gates would settle K=>D in all dimensions; a proof under nefness gives a clean conditional theorem."
+      }
+    },
+    {
+      "abstract": "Unrestricted crepant factorization: factor every smooth projective K-equivalence into finitely many projective flops without nef, toric, or dimension bounds.",
+      "importance": "This is the first indispensable gate in the proposed MMP reduction. It is Kawamata's general flop-factorization conjecture specialized to the root setting, not a consequence of weak factorization.",
+      "kind": "obligation_add",
+      "operation_id": "OP-OBL-1b418cfd9d20468d9a9ea2e11d4cb2fe",
+      "partial_progress": "K-equivalence gives an isomorphism in codimension one. Kawamata, Flops Connect Minimal Models, Publ. RIMS 44 (2008), Theorem 1, DOI 10.2977/PRIMS/1210167332, proves factorization for projective Q-factorial terminal pairs when K+B is relatively nef. Kawamata's 2017 survey, Conjecture 3.6 and Theorem 3.7 (arXiv:1710.07370), records the unrestricted statement as conjectural and the nef and toric cases as known. Daigo Ito, arXiv:2309.08147v3 (2025), Remark 5.36, still records general factorization as conjectural, with threefold, minimal-model, and toric cases known.",
+      "predecessor_fact_ids": [],
+      "proposal_id": "PROP-OBL-86003642632d4bc083c6cbb68cd8a7f9",
+      "related_route_ids": [
+        "PROP-ROUTE-40d55581b07c4fbf8d42a0d5f191a363"
+      ],
+      "relations": [
+        {
+          "conclusion": "ROOT",
+          "explanation": "The proposed proof by composing elementary flop equivalences first requires this factorization under the original hypotheses.",
+          "premise_memory_ids": [],
+          "relation_type": "conjectural_necessary_gate_for_route",
+          "supporting_fact_ids": []
+        }
+      ],
+      "statement": "Given smooth projective complex K-equivalent varieties X and Y under the original hypotheses, prove that their induced birational map factors into finitely many projective flops through Q-factorial terminal models (with enough control to recover X and Y), without assuming K_X nef, dimension at most three, toricity, or another special condition; alternatively produce an actual K-equivalence for which such a factorization is impossible."
+    },
+    {
+      "abstract": "Categorical flop and descent gate: construct compatible untwisted equivalences for all projective flops, including singular MMP intermediates, and prove endpoint descent.",
+      "importance": "Even a complete birational factorization does not imply ROOT until every elementary step has a globally compatible categorical equivalence of the required ordinary endpoint categories.",
+      "kind": "obligation_add",
+      "operation_id": "OP-OBL-ccefe11e756d41d09686918845312b8b",
+      "partial_progress": "Threefold flops are covered by Bridgeland, Chen, and Kawamata's canonical-covering-stack formulation. Standard and Mukai flops and many VGIT or homogeneous flops are known. In higher dimension the general flop-derived-equivalence assertion remains conjectural. The projective Mukai family gives a decisive warning: for dimension at least four the smooth-common-blowup push-pull functor is not fully faithful, while a reducible fiber-product kernel is an equivalence.",
+      "predecessor_fact_ids": [],
+      "proposal_id": "PROP-OBL-acde30243ac34a0f93f99b209b160f65",
+      "related_route_ids": [
+        "PROP-ROUTE-40d55581b07c4fbf8d42a0d5f191a363"
+      ],
+      "relations": [
+        {
+          "conclusion": "ROOT",
+          "explanation": "A finite flop factorization plus compatible equivalences for all steps would compose to the desired endpoint equivalence.",
+          "premise_memory_ids": [
+            "PROP-OBL-86003642632d4bc083c6cbb68cd8a7f9"
+          ],
+          "relation_type": "conjectural_sufficient_gate_after_factorization",
+          "supporting_fact_ids": []
+        }
+      ],
+      "statement": "For every projective flop that can occur in a factorization of a smooth projective K-equivalence, construct an exact C-linear equivalence in categories that compose to D^b Coh(X)≃D^b Coh(Y). If an intermediate model is Q-factorial terminal but singular, specify the stack, categorical resolution, or noncommutative category used and prove that composition descends to the ordinary untwisted bounded derived categories of the smooth endpoints. The construction may not assume that Rg_*Lf^* for a smooth common resolution is an equivalence."
+    },
+    {
+      "abstract": "Status memo: the arbitrary-dimensional K=>D statement remains the DK conjecture; weak factorization, MMP factorization, and categorical kernels fail at distinct logical points.",
+      "content": "The root statement is still the Bondal-Orlov-Kawamata DK conjecture, explicitly restated as Conjecture 1.1 in Rampazzo-Xie, arXiv:2410.20446v2 (2025), where a new D5 flop is presented as evidence rather than a general proof. The factorization route has four separate gates. (1) Discrepancies: smooth K-equivalence is small. (2) Smooth weak factorization: AKMW gives smooth projective blowups and blowdowns, but every nontrivial such morphism changes the canonical divisor, so the directions of the corresponding semiorthogonal embeddings alternate and do not formally cancel. (3) MMP factorization: Kawamata 2008 connects minimal models by flops, but unrestricted crepant factorization is Conjecture 3.6 of Kawamata's 2017 survey; moreover intermediate Q-factorial terminal models may be singular. (4) Categorical steps: arbitrary higher-dimensional flops are not covered by a general untwisted derived-equivalence theorem, and the kernel is delicate. Kawamata's projective Mukai flop has a smooth common resolution whose push-pull is not fully faithful for dimension at least four, although a different reducible-correspondence kernel is an equivalence. Thus neither weak factorization nor the given common resolution converts the root hypotheses into an equivalence. Dimension at most two is elementary, and dimension three follows by Kawamata's threefold flop factorization together with Bridgeland-Chen-Kawamata flop equivalences; toric/toroidal, standard/Mukai, and various VGIT or homogeneous flops are further special cases only.",
+      "genre": "high-level",
+      "kind": "memo",
+      "operation_id": "OP-MEMO-441c3c30bd1749b4a047df7a3ca1e646",
+      "proposal_id": "PROP-MEMO-6b6fe0aa8f404257868870c6bf15acc6",
+      "related_route_ids": [
+        "PROP-ROUTE-40d55581b07c4fbf8d42a0d5f191a363"
+      ]
+    }
+  ],
+  "outcome_status": "progress",
+  "progress_id": "PRG-0b074c5c-84cd-4d5d-95ea-ba27433fd217",
+  "progress_since_previous": "Completed the discrepancy/factorization audit: K-equivalence is small, smooth weak-factorization morphisms cannot be crepant termwise, unrestricted flop factorization is itself conjectural, and even the minimal-model theorem passes through potentially singular terminal models.",
+  "sequence": 2,
+  "skill": "record-progress",
+  "task_id": "T-6319fbf653d044cd81beb63c46d286d9"
+}
