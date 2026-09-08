@@ -220,10 +220,7 @@ python3 scripts/export_release.py
 - `examples/`：最小输入和配置；`tests/`、`evals/`：测试与评估工具。
 - `Design.md`、`IMPLEMENTATION.md`：研究流程设计与实现决策。
 
-## 致谢与许可
-
-Franta 的智能体设计受到 Bin Dong 及其合作者的数学研究智能体工作的启发。
-本仓库是独立实现，不代表获得他们的认可或背书。
+## 许可
 
 当前包元数据仍标为 **Proprietary**，本仓库没有授予开源许可证；需要许可的使用方式
 应向作者取得授权。网页中的第三方资源保留各自的[版权与许可说明](src/dashboard_system/static/vendor/NOTICE.md)。

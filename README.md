@@ -220,11 +220,7 @@ private: they contain research transcripts and may contain copied credentials.
 | `tests/`, `evals/` | Automated regressions and read-only evaluation tools |
 | `Design.md`, `IMPLEMENTATION.md` | Research workflow specification and implementation decisions |
 
-## Acknowledgment and license
-
-Franta's agent design was inspired by the mathematical research agent work of
-Bin Dong and collaborators. This repository is a separate implementation and
-does not claim their endorsement.
+## License
 
 The current package metadata identifies the project as **Proprietary**. No
 open-source license is granted by this repository; obtain the author's
