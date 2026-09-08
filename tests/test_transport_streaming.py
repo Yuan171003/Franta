@@ -63,6 +63,7 @@ class StreamingTransportTests(unittest.TestCase):
             (
                 "import json, time",
                 "print(json.dumps({'type':'thread.started','thread_id':'stream-thread'}), flush=True)",
+                "time.sleep(0.1)",
                 "print(json.dumps({'type':'item.completed','item':{'id':'tool-1','type':'mcp_tool_call','server':'franta','tool':'record_progress','status':'completed'}}), flush=True)",
                 "time.sleep(30)",
             )
@@ -89,23 +90,30 @@ class StreamingTransportTests(unittest.TestCase):
             thread = threading.Thread(target=invoke)
             thread.start()
             audit = base / "state/calls/stream-call.jsonl"
-            deadline = time.monotonic() + 5
-            while time.monotonic() < deadline:
-                if audit.exists() and "transport.codex_event" in audit.read_text(
-                    encoding="utf-8"
-                ):
-                    break
-                time.sleep(0.02)
-            self.assertTrue(thread.is_alive(), "process exited before streaming was observed")
-            self.assertIn("stream-thread", audit.read_text(encoding="utf-8"))
-            self.assertEqual(
-                transport.successful_skill_invocation_count(
-                    "stream-call", "record-progress"
-                ),
-                1,
-            )
-            self.assertTrue(transport.cancel("stream-call", reason="obsolete task"))
-            thread.join(timeout=5)
+            try:
+                deadline = time.monotonic() + 5
+                while time.monotonic() < deadline:
+                    if transport.successful_skill_invocation_count(
+                        "stream-call", "record-progress"
+                    ):
+                        break
+                    if not thread.is_alive():
+                        break
+                    time.sleep(0.02)
+                self.assertTrue(thread.is_alive(), "process exited before streaming was observed")
+                self.assertEqual(
+                    transport.successful_skill_invocation_count(
+                        "stream-call", "record-progress"
+                    ),
+                    1,
+                )
+                self.assertIn("stream-thread", audit.read_text(encoding="utf-8"))
+                self.assertTrue(transport.cancel("stream-call", reason="obsolete task"))
+            finally:
+                # A failed assertion must not leave the sleeping child and its
+                # reader thread alive for the remaining test suite.
+                transport.cancel("stream-call", reason="streaming test cleanup")
+                thread.join(timeout=5)
             self.assertFalse(thread.is_alive())
             self.assertEqual(len(failures), 1)
             self.assertIsInstance(failures[0], CodexTransportError)

@@ -120,6 +120,48 @@ class DashboardIntegrationTests(unittest.TestCase):
         (directory / "server.json").write_text("[]")
         self.assertIsNone(_descriptor(self.project))
 
+    def test_failed_dashboard_start_reports_current_child_output_and_exit_code(self) -> None:
+        directory = dashboard_directory(self.project)
+        (directory / "server.log").write_text("old unrelated output\n")
+        process = Mock(pid=12345)
+        process.poll.return_value = 7
+
+        def launch(*args, **kwargs):
+            kwargs["stderr"].write(b"Dashboard startup: binding loopback HTTP port 1113\nchild startup failed\n")
+            kwargs["stderr"].flush()
+            return process
+
+        with (
+            patch("franta.dashboard_adapter._descriptor", return_value=None),
+            patch("franta.dashboard_adapter.subprocess.Popen", side_effect=launch),
+            patch("franta.dashboard_adapter.threading.Thread"),
+            patch("franta.dashboard_adapter.time.sleep"),
+        ):
+            with self.assertRaises(RuntimeError) as failure:
+                ensure_dashboard(self.project)
+        message = str(failure.exception)
+        self.assertIn("PID 12345, exit code 7", message)
+        self.assertIn("child startup failed", message)
+        self.assertIn(str(directory / "server.log"), message)
+        self.assertNotIn("old unrelated output", message)
+
+    def test_dashboard_startup_wait_uses_elapsed_deadline_and_reports_live_child(self) -> None:
+        process = Mock(pid=12345)
+        process.poll.return_value = None
+        # Initial deadline, one unsuccessful probe, elapsed sleep budget, then
+        # an exceeded deadline. A slow operation must not buy sixty new waits.
+        with (
+            patch("franta.dashboard_adapter._descriptor", return_value=None) as descriptor,
+            patch("franta.dashboard_adapter.subprocess.Popen", return_value=process),
+            patch("franta.dashboard_adapter.threading.Thread"),
+            patch("franta.dashboard_adapter.time.monotonic", side_effect=[0.0, 0.0, 6.5, 6.5, 6.5]),
+            patch("franta.dashboard_adapter.time.sleep") as sleep,
+        ):
+            with self.assertRaisesRegex(RuntimeError, r"after 6.5s .*still running"):
+                ensure_dashboard(self.project)
+        self.assertEqual(descriptor.call_count, 2)
+        sleep.assert_called_once_with(0.0)
+
     def test_dashboard_starts_reuses_and_survives_a_stopped_research_run(self) -> None:
         directory = dashboard_directory(self.project)
         publish_json(directory / "runner.json", {"status": "stopped", "pid": os.getpid()})

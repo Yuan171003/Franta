@@ -8,6 +8,7 @@ import json
 import mimetypes
 from pathlib import Path
 import secrets
+from socketserver import TCPServer
 import threading
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
@@ -26,6 +27,13 @@ class _HTTPServer(ThreadingHTTPServer):
     daemon_threads = True
     block_on_close = False
     allow_reuse_address = False
+
+    def server_bind(self) -> None:
+        # HTTPServer.server_bind performs a reverse-DNS lookup for server_name.
+        # This dashboard binds a fixed numeric loopback address; DNS is unused
+        # and can stall startup for tens of seconds on disconnected/CI hosts.
+        TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
 
 
 class DashboardServer:

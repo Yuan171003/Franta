@@ -211,6 +211,18 @@ class DashboardServerTests(unittest.TestCase):
                 DashboardServer(self.read, self.commands, Model(), self.root / "other", port=1113)
             self.assertEqual(httpd.call_count, 1)
 
+    def test_loopback_server_startup_does_not_depend_on_reverse_dns(self) -> None:
+        with socket.socket() as available:
+            available.bind(("127.0.0.1", 0))
+            port = available.getsockname()[1]
+        with mock.patch("socket.getfqdn", side_effect=AssertionError("reverse DNS must not run")):
+            server = DashboardServer(
+                self.read, self.commands, Model(), self.root / "no-dns", port=port, auto_start=False,
+            )
+        self.addCleanup(server.shutdown)
+        self.assertEqual(server._httpd.server_name, "127.0.0.1")
+        self.assertEqual(server._httpd.server_port, server.address[1])
+
     def test_shutdown_is_idempotent_and_server_thread_exits(self) -> None:
         self.server.shutdown()
         self.server.shutdown()

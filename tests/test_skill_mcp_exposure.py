@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -507,6 +508,8 @@ class SkillMcpExposureTests(unittest.TestCase):
 
             def fake_run(command, **kwargs):
                 self.assertIsInstance(command, list)
+                self.assertEqual(command[0], "/test-tools/bwrap")
+                self.assertIn("--unshare-all", command)
                 self.assertFalse(kwargs["shell"])
                 self.assertNotIn("HTTP_PROXY", kwargs["env"])
                 if "--outdir" in command:
@@ -517,7 +520,15 @@ class SkillMcpExposureTests(unittest.TestCase):
                     return subprocess.CompletedProcess(command, 0, "compiled", "")
                 return subprocess.CompletedProcess(command, 0, "Tectonic 0.test", "")
 
-            with mock.patch("franta.skill_runtime.subprocess.run", side_effect=fake_run):
+            # Exercise the real command builder without requiring a sandbox
+            # executable on the machine running this mocked compiler test.
+            with (
+                mock.patch("franta.skill_runtime.sys.platform", "linux"),
+                mock.patch(
+                    "franta.skill_runtime.shutil.which", return_value="/test-tools/bwrap"
+                ),
+                mock.patch("franta.skill_runtime.subprocess.run", side_effect=fake_run),
+            ):
                 result = compile_human_guidance(
                     SkillContext.load(workspace.path),
                     {
@@ -780,10 +791,22 @@ class SkillMcpExposureTests(unittest.TestCase):
 
     @unittest.skipUnless(
         os.environ.get("FRANTA_RUN_CONFINEMENT_INTEGRATION") == "1",
-        "requires an unsandboxed parent so Seatbelt can apply the child profile",
+        "requires an unsandboxed parent and an available OS confinement backend",
     )
     def test_real_cas_child_cannot_read_outside_workspace_or_open_network(self) -> None:
-        with tempfile.TemporaryDirectory() as raw:
+        with (
+            tempfile.TemporaryDirectory() as raw,
+            socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener,
+        ):
+            listener.bind(("127.0.0.1", 0))
+            listener.listen(2)
+            address = listener.getsockname()
+            # Prove this host endpoint is reachable before checking that the
+            # confined child cannot reach it. UDP connect alone sends no data
+            # and can succeed inside an isolated Linux network namespace.
+            with socket.create_connection(address, timeout=2):
+                with listener.accept()[0]:
+                    pass
             root = Path(raw)
             secret = root / "scheduler-secret.txt"
             secret.write_text("must-not-leak", encoding="utf-8")
@@ -798,9 +821,8 @@ class SkillMcpExposureTests(unittest.TestCase):
                     "except OSError:",
                     "    print('filesystem=blocked')",
                     "try:",
-                    "    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)",
-                    "    s.connect(('127.0.0.1', 9))",
-                    "    print('network=leaked')",
+                    f"    with socket.create_connection({address!r}, timeout=2):",
+                    "        print('network=leaked')",
                     "except OSError:",
                     "    print('network=blocked')",
                 ]

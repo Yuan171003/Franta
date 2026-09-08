@@ -27,6 +27,9 @@ from .dashboard_commands import (
 from .human_guidance import submit_human_guidance
 
 
+_DASHBOARD_STARTUP_SECONDS = 6.0
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -402,14 +405,18 @@ def ensure_dashboard(project: str | Path, *, port: int = 1113) -> str:
     if existing:
         return str(existing["url"])
     directory = dashboard_directory(project)
-    with (directory / "server.log").open("ab") as log:
+    log_path = directory / "server.log"
+    with log_path.open("ab") as log:
+        log_offset = log.tell()
         process = subprocess.Popen(
-            [sys.executable, "-m", "franta.dashboard_adapter", str(project), "--port", str(port)],
+            [sys.executable, "-u", "-m", "franta.dashboard_adapter", str(project), "--port", str(port)],
             stdin=subprocess.DEVNULL, stdout=log, stderr=log,
             start_new_session=True, env=_environment(),
         )
     threading.Thread(target=process.wait, name="dashboard-reaper", daemon=True).start()
-    for _ in range(60):
+    started = time.monotonic()
+    deadline = started + _DASHBOARD_STARTUP_SECONDS
+    while time.monotonic() < deadline:
         existing = _descriptor(project)
         if existing:
             return str(existing["url"])
@@ -421,8 +428,21 @@ def ensure_dashboard(project: str | Path, *, port: int = 1113) -> str:
             if existing:
                 return str(existing["url"])
             break
-        time.sleep(0.1)
-    raise RuntimeError(f"Dashboard failed to start; see {directory / 'server.log'}")
+        time.sleep(min(0.1, max(0.0, deadline - time.monotonic())))
+    try:
+        with log_path.open("rb") as log:
+            log.seek(0, os.SEEK_END)
+            log.seek(max(log_offset, log.tell() - 4096))
+            diagnostic = log.read().decode("utf-8", errors="replace").strip()
+    except OSError as exc:
+        diagnostic = f"Could not read child log: {exc}"
+    returncode = process.poll()
+    status = "still running" if returncode is None else f"exit code {returncode}"
+    raise RuntimeError(
+        f"Dashboard failed to start after {time.monotonic() - started:.1f}s "
+        f"(PID {process.pid}, {status}); see {log_path}\n"
+        f"Recent child output:\n{diagnostic or '[no child output]'}"
+    )
 
 
 def _resume_project(project: Path) -> None:
@@ -465,6 +485,7 @@ def _resume_project(project: Path) -> None:
 
 
 def serve_project(project: Path, *, port: int = 1113) -> None:
+    print("Dashboard startup: loading host adapters", file=sys.stderr, flush=True)
     from dashboard_system.server import DashboardServer
     from .dashboard_read import FrantaDashboardRead
     directory = dashboard_directory(project)
@@ -472,13 +493,16 @@ def serve_project(project: Path, *, port: int = 1113) -> None:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
+            print("Dashboard startup: another dashboard holds the project lock", file=sys.stderr, flush=True)
             return
         read_port = FrantaDashboardRead(project)
         monitor_port = FrantaReadOnlyMonitor(project)
+        print(f"Dashboard startup: binding loopback HTTP port {port}", file=sys.stderr, flush=True)
         server = DashboardServer(
             read_port, FrantaOperatorCommands(project, read_port), monitor_port,
             cache_dir=directory, port=port,
         )
+        print(f"Dashboard startup: bound {server.url}; publishing descriptor", file=sys.stderr, flush=True)
         instance_id = uuid.uuid4().hex
         server.instance_id = instance_id
         try:
@@ -520,6 +544,7 @@ def serve_project(project: Path, *, port: int = 1113) -> None:
 
         threading.Thread(target=continue_after_feedback, daemon=True).start()
         try:
+            print(f"Dashboard startup: serving {server.url}", file=sys.stderr, flush=True)
             server.serve_forever()
         finally:
             stop.set()

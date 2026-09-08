@@ -160,12 +160,13 @@ def _scoped_operation_id(
     records and CAS citations.
     """
 
-    return f"XOP-{namespace}-{_digest({
+    digest = _digest({
         'turn_id': context.turn_id,
         'worker_session_id': context.worker_session_id,
         'attempt_no': context.attempt_no,
         'operation_id': client_operation_id,
-    })[:40]}"
+    })
+    return f"XOP-{namespace}-{digest[:40]}"
 
 
 def _quota(value: int | None, field: str) -> int | None:
