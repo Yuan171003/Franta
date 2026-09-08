@@ -7,8 +7,8 @@ release source; they are not a guarantee of the absence of every possible bug.
 
 | Environment | Command | Result |
 | --- | --- | --- |
-| Python 3.14.6, freshly extracted source ZIP, real CAS/confinement enabled | `FRANTA_RUN_CONFINEMENT_INTEGRATION=1 PYTHONPATH=src python3 -m unittest discover -s tests -v` | 738 tests: 737 passed, 1 skipped; 110.931 seconds |
-| Python 3.12.14, default offline suite | `PYTHONPATH=src python3 -m unittest discover -s tests -v` | 738 tests: 733 passed, 5 skipped; 83.581 seconds |
+| Python 3.14.6, real CAS/confinement enabled | `FRANTA_RUN_CONFINEMENT_INTEGRATION=1 PYTHONPATH=src python3 -m unittest discover -s tests -v` | 741 tests: 740 passed, 1 skipped; 100.386 seconds |
+| Python 3.12.14, default offline suite | `PYTHONPATH=src python3 -m unittest discover -s tests -v` | 741 tests: 736 passed, 5 skipped; 79.252 seconds |
 | Read-only synthetic evaluator | `PYTHONPATH=src python3 -m franta.evaluation --snapshot evals/fixtures/complete_observation.json` | All 9 scenarios passed |
 
 The single skip in the Python 3.14 run is the real Linux/bubblewrap test; this
@@ -22,6 +22,23 @@ The suite also covers scheduling, persistence, recovery, reference resolution,
 permission boundaries, subprocess cleanup, dashboard HTTP behavior, Explorer,
 Advisor, skill receipts, and installed-resource materialization.
 
+## GitHub Actions
+
+The [cross-platform workflow](https://github.com/Yuan171003/Franta/actions/runs/34242367877)
+for code commit `ab8289ee8d87c2a47750bda106ce6f07762f5019` completed successfully:
+
+| Checks | Result |
+| --- | --- |
+| macOS, Python 3.11 / 3.12 / 3.13 / 3.14 | 741 tests per job, no failures; 5 optional/platform skips per job |
+| Ubuntu, Python 3.11 / 3.12 / 3.13 / 3.14 | 741 tests per job, no failures; 6 optional/platform skips per job |
+| Real Linux/bubblewrap confinement | 12 portability tests passed; 22 skill tests completed with 4 optional/platform skips |
+| Source distribution, wheel, and installed resources | Build, metadata, 49-resource audit, and 13-skill installed smoke passed |
+
+All 10 jobs passed. The Linux network test uses a verified reachable host TCP
+listener and checks that a confined child cannot connect to it; a UDP connect
+alone is not evidence of access outside a network namespace. A macOS negative
+control with only network denial removed correctly failed this probe.
+
 ## Release-specific fixes and test maintenance
 
 - Renamed the Python package, console command, configuration fields, environment
@@ -30,6 +47,13 @@ Advisor, skill receipts, and installed-resource materialization.
 - Replaced personal executable locations with optional portable configuration;
   verified PATH lookup, manifest-relative paths, home expansion, and spaces.
 - Added Linux bubblewrap confinement and platform-aware Tectonic cache lookup.
+- Removed Python 3.12-only f-string syntax while preserving generated operation
+  IDs, so the declared Python 3.11 minimum is exercised in CI.
+- Removed an unnecessary reverse-DNS lookup from the numeric loopback dashboard
+  listener. Startup failures now include child-process status and current logs.
+- Made mocked compiler tests independent of installed sandbox tools, tested
+  actual host TCP isolation, and synchronized streaming assertions with the
+  completed tool event rather than an earlier unrelated event.
 - Fixed long and multibyte project paths by using the existing authenticated,
   private file spool when a Unix-domain socket address exceeds 103 encoded
   bytes. Other unexpected socket errors remain visible.
@@ -72,9 +96,9 @@ is 456,810 bytes. No repository metadata was inserted into the source ZIP. Use `
 - No live Codex model call or long-running mathematical research evaluation was
   launched for this release. Authentication, model entitlement, service limits,
   and network access must be verified in the deployment environment.
-- Linux confinement was reviewed and tested through command/error contracts;
-  real Linux execution and the Python 3.11/3.13 matrix remain for GitHub Actions
-  to exercise. The workflow includes a separate real bubblewrap job.
+- Linux confinement and the Python 3.11-3.14 matrix passed GitHub Actions.
+  Optional SageMath/Macaulay2/Tectonic execution was tested locally on macOS;
+  those CAS installations are not part of the hosted Linux validation.
 - Native Windows is not supported; use a suitable Linux environment.
 - This is a fresh-project release. Previously generated internal research
   directories were preserved outside the publication set and were not migrated.
