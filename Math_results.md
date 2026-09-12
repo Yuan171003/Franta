@@ -1,0 +1,1 @@
+Internally verified proofs cover Orlov’s conjecture for smooth projective complex threefolds of positive Kodaira dimension and all smooth strict-CY3 Weierstrass models (human verification in progress).
