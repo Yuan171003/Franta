@@ -9,11 +9,14 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from franta.config import load_manifest
+from franta.contracts.agent_access import policy_for
+from franta.execution_gateway.transport import CodexTransportError
 from franta.explorer_adapter import (
     build_main_sort_explorer_snapshot_for_frozen_turn,
 )
 from franta.materialize import explorer_snapshot_digest
 from franta.runtime import AgentCall, FrantaRuntime
+from franta.scheduler import StaleLeaseError
 from franta.skill_runtime import SkillContext, SkillRuntime
 
 
@@ -172,7 +175,462 @@ def _brainstorm_assignment(runtime: FrantaRuntime, marker: str) -> dict[str, Any
     }
 
 
+def _deadline_test_result(
+    runtime: FrantaRuntime, call: AgentCall
+) -> dict[str, Any]:
+    """Stage real artifacts for a failed worker, empty sort, or fresh Main."""
+
+    def stage(skill: str, payload: dict[str, Any]) -> dict[str, Any]:
+        result = SkillRuntime(SkillContext.load(call.workspace.path)).invoke(
+            skill, payload
+        )
+        return runtime._record_broker_skill_result(
+            call=call,
+            skill=skill,
+            payload=payload,
+            result=result,
+            capability_token=f"deadline-regression:{call.call_id}:{skill}",
+        )
+
+    if call.kind == "main":
+        operation_id = f"AR-{call.call_id}"
+        batch_id = str(call.payload["reserved_batch_id"])
+        stage(
+            "task-writing",
+            {
+                "operation_id": operation_id,
+                "batch_finalized": True,
+                "batch_id": batch_id,
+                "objective": "Independently investigate ROOT after the sort barrier.",
+                "work_mode": "brainstorm",
+                "if_resume": None,
+                "main_route_ids": [],
+                "main_obligation_ids": [call.payload["root"]["obligation_id"]],
+                "selected_new_perspective": None,
+                "assignment_portfolio": _brainstorm_assignment(runtime, "NEXT")[
+                    "portfolio"
+                ],
+                "reason": "Exercise fresh planning in the next Franta cycle.",
+                "root_solution_fact_id": None,
+            },
+        )
+        return {
+            "decision": "assignments",
+            "batch_id": batch_id,
+            "assignment_report_ids": [operation_id],
+            "wait_for_task_ids": [],
+            "report": None,
+            "decline_proof_writer": False,
+        }
+    if call.kind not in {"worker", "main-sort"}:
+        raise AssertionError(f"unexpected deterministic call {call.kind}")
+    card = json.loads(call.workspace.task_card_path.read_text(encoding="utf-8"))
+    progress_id = f"PRG-{call.call_id}"
+    outcome = "finished" if call.kind == "main-sort" else "failed"
+    stage(
+        "record-progress",
+        {
+            "operation_id": f"RP-{call.call_id}",
+            "progress_id": progress_id,
+            "sequence": 1,
+            "is_final": True,
+            "outcome_status": outcome,
+            "progress_since_previous": "No records require promotion or verification.",
+            "operations": [],
+            "computation_operation_ids": [],
+            "explorer_computation_promotions": [],
+            "fact_challenges": [],
+            "completion_evidence_ids": [],
+            "attempt_summary": {
+                "work_mode": card["mode"],
+                "task": card["objective"],
+                "proposed_outcome": outcome,
+                "cumulative_important_progress": "No rigorous ROOT advance.",
+                "completion_evidence_operation_ids": [],
+                "most_promising_next_steps": "Try an independent ROOT direction.",
+            },
+        },
+    )
+    if call.kind == "main-sort":
+        return {
+            "sort_ended": True,
+            "final_progress_id": progress_id,
+            "selected_explorer_record_ids": [],
+            "deferred_computation_record_ids": [],
+        }
+    return {"attempt_ended": True, "final_progress_id": progress_id}
+
+
 class RuntimeAlternationEndToEndTests(unittest.TestCase):
+    def test_resume_reuses_current_post_sort_main_without_relaunching_result(
+        self,
+    ) -> None:
+        for saved_status in ("prepared", "completed"):
+            with (
+                self.subTest(saved_status=saved_status),
+                tempfile.TemporaryDirectory() as raw,
+            ):
+                invoked: list[tuple[str, str]] = []
+
+                def executor(call: AgentCall) -> dict[str, Any]:
+                    invoked.append((call.kind, call.call_id))
+                    return _deadline_test_result(runtime, call)
+
+                runtime = FrantaRuntime.initialize(
+                    load_manifest(_write_two_worker_manifest(Path(raw))),
+                    executor=executor,
+                )
+                try:
+                    runtime.start_services()
+                    runtime.scheduler.commit_initial_trim({"category_ids": []})
+                    runtime.scheduler.activate_alternation()
+                    deadline = datetime.fromisoformat(
+                        runtime.scheduler.state["phase_control"]["explorer"][
+                            "admission_deadline"
+                        ]
+                    )
+                    runtime.scheduler._reducer_now = (  # type: ignore[method-assign]
+                        lambda now=None: deadline if now is None else now
+                    )
+                    assert runtime.explorer_program is not None
+                    runtime.explorer_program.advance_turn()
+                    # Stop at the durable boundary after sort commits and
+                    # before its Main continuation opens Franta admission.
+                    runtime._resume_main_after_sort = (  # type: ignore[method-assign]
+                        lambda **_kwargs: False
+                    )
+                    runtime._run_franta_sort_barrier()
+                    sort = runtime.scheduler.state["phase_control"]["sort"]
+                    sort_call_id = str(sort["sort_call_id"])
+                    context = runtime._main_context("BATCH-CURRENT-POST-SORT")
+                    main_call_id = runtime.scheduler.prepare_call(
+                        "main",
+                        context,
+                        continuation={
+                            "reserved_batch_id": "BATCH-CURRENT-POST-SORT",
+                            "post_sort_call_id": sort_call_id,
+                            "session_key": "main:project",
+                        },
+                    )
+                    if saved_status == "completed":
+                        policy = policy_for("main")
+                        workspace = runtime._make_workspace(
+                            call_id=main_call_id, policy=policy, context=context
+                        )
+                        runtime._run_prepared_call(
+                            main_call_id,
+                            workspace=workspace,
+                            policy=policy,
+                            session_key="main:project",
+                        )
+                    self.assertEqual(
+                        runtime.scheduler.state["calls"][main_call_id]["status"],
+                        saved_status,
+                    )
+                    project_dir = runtime.layout.root
+                finally:
+                    runtime.close()
+
+                runtime = FrantaRuntime.open(project_dir, executor=executor)
+                try:
+                    runtime.scheduler._reducer_now = (  # type: ignore[method-assign]
+                        lambda now=None: deadline if now is None else now
+                    )
+                    runtime.run(resume=True, max_cycles=1)
+
+                    state = runtime.scheduler.state
+                    self.assertEqual(
+                        invoked, [("main-sort", sort_call_id), ("main", main_call_id)]
+                    )
+                    self.assertEqual(
+                        state["calls"][main_call_id]["status"], "committed"
+                    )
+                    self.assertEqual(state["calls"][main_call_id]["attempt"], 1)
+                    self.assertEqual(state["phase_control"]["phase"], "franta_run")
+                    self.assertEqual(
+                        state["phase_control"]["sort"]["planning_call_id"], main_call_id
+                    )
+                    self.assertEqual(len(runtime._ordinary_worker_launches()), 1)
+                finally:
+                    runtime.close()
+
+    def test_already_draining_completed_controls_are_fenced_idempotently(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            runtime = FrantaRuntime.initialize(
+                load_manifest(_write_two_worker_manifest(Path(raw)))
+            )
+            try:
+                call_ids = _open_test_franta_run(runtime)
+                completed: dict[str, dict[str, Any]] = {}
+                for call_id in call_ids:
+                    epoch, _ = runtime.scheduler.mark_call_running(call_id)
+                    runtime.scheduler.accept_call_result(call_id, epoch, {})
+                    completed[call_id] = runtime.scheduler.state["calls"][call_id]
+                deadline = datetime.fromisoformat(
+                    runtime.scheduler.state["phase_control"]["franta"][
+                        "admission_deadline"
+                    ]
+                )
+                runtime.scheduler.tick_alternation(now=deadline)
+                # Legacy builds could persist a completed control after the
+                # phase-transition cancellation had already happened.
+                with runtime.scheduler._mutate() as state:
+                    state["calls"].update(completed)
+
+                self.assertEqual(
+                    runtime.scheduler.tick_alternation(now=deadline), "franta_drain"
+                )
+                fenced = runtime.scheduler.state
+                for call_id in call_ids:
+                    with self.subTest(call_id=call_id):
+                        call = fenced["calls"][call_id]
+                        self.assertEqual(call["status"], "cancelled")
+                        self.assertGreater(
+                            call["lease_epoch"], completed[call_id]["lease_epoch"]
+                        )
+                        with self.assertRaises(StaleLeaseError):
+                            runtime.scheduler.accept_call_result(
+                                call_id, completed[call_id]["lease_epoch"], {}
+                            )
+                runtime.scheduler.tick_alternation(now=deadline)
+                self.assertEqual(runtime.scheduler.state["calls"], fenced["calls"])
+                self.assertEqual(runtime.scheduler.state["events"], fenced["events"])
+            finally:
+                runtime.close()
+
+    def test_late_control_transport_error_cannot_restart_past_deadline(self) -> None:
+        for cancel_before_error in (False, True):
+            with (
+                self.subTest(cancel_before_error=cancel_before_error),
+                tempfile.TemporaryDirectory() as raw,
+            ):
+                invoked: list[tuple[str, int]] = []
+
+                def executor(call: AgentCall) -> dict[str, Any]:
+                    invoked.append((call.call_id, call.lease_epoch))
+                    deadline = datetime.fromisoformat(
+                        runtime.scheduler.state["phase_control"]["franta"][
+                            "admission_deadline"
+                        ]
+                    )
+                    runtime.scheduler._reducer_now = (  # type: ignore[method-assign]
+                        lambda now=None: deadline if now is None else now
+                    )
+                    if cancel_before_error:
+                        runtime.scheduler.tick_alternation()
+                    raise CodexTransportError("deterministic late transport failure")
+
+                runtime = FrantaRuntime.initialize(
+                    load_manifest(_write_two_worker_manifest(Path(raw))),
+                    executor=executor,
+                )
+                try:
+                    runtime.start_services()
+                    runtime.scheduler.commit_initial_trim({"category_ids": []})
+                    _enter_test_franta_run(runtime)
+                    self.assertTrue(runtime._run_main())
+
+                    self.assertEqual(len(invoked), 1)
+                    call_id, original_epoch = invoked[0]
+                    state = runtime.scheduler.state
+                    self.assertEqual(state["phase_control"]["phase"], "franta_drain")
+                    self.assertEqual(state["calls"][call_id]["status"], "cancelled")
+                    self.assertEqual(state["calls"][call_id]["attempt"], 1)
+                    self.assertGreater(
+                        state["calls"][call_id]["lease_epoch"], original_epoch
+                    )
+                    self.assertFalse(runtime.scheduler.has_blocking_attention())
+                    self.assertFalse(state["halt_requested"])
+                    self.assertFalse(runtime._recover_control_calls())
+                    self.assertEqual(len(invoked), 1)
+                finally:
+                    runtime.close()
+
+    def test_worker_return_after_deadline_cannot_start_main_or_trim(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            runtime: FrantaRuntime | None = None
+            invoked: list[str] = []
+
+            def executor(call: AgentCall) -> dict[str, Any]:
+                assert runtime is not None
+                invoked.append(call.kind)
+                result = _deadline_test_result(runtime, call)
+                if call.kind == "worker":
+                    deadline = datetime.fromisoformat(
+                        runtime.scheduler.state["phase_control"]["franta"][
+                            "admission_deadline"
+                        ]
+                    )
+                    original_clock = runtime.scheduler._reducer_now
+                    runtime.scheduler._reducer_now = (  # type: ignore[method-assign]
+                        lambda now=None: deadline if now is None else original_clock(now)
+                    )
+                    runtime.scheduler.tick_alternation()
+                return result
+
+            runtime = FrantaRuntime.initialize(
+                load_manifest(_write_two_worker_manifest(Path(raw))),
+                executor=executor,
+            )
+            try:
+                runtime.scheduler.commit_initial_trim({"category_ids": []})
+                _enter_test_franta_run(runtime)
+                task_id = runtime.scheduler.submit_batch(
+                    "BATCH-WORKER-RETURN-DEADLINE",
+                    [_brainstorm_assignment(runtime, "WORKER-RETURN-DEADLINE")],
+                )[0]
+                runtime.run(max_cycles=1)
+
+                self.assertEqual(invoked, ["worker"])
+                state = runtime.scheduler.state
+                self.assertEqual(state["phase_control"]["phase"], "franta_drain")
+                self.assertEqual(state["tasks"][task_id]["state"], "closed")
+                self.assertEqual(state["tasks"][task_id]["final_status"], "failed")
+                self.assertFalse(runtime._run_main())
+                self.assertFalse(runtime._run_trim_review())
+                self.assertFalse(
+                    any(
+                        call["kind"] in {"main", "trimmer"}
+                        for call in runtime.scheduler.state["calls"].values()
+                    )
+                )
+
+                runtime.run(max_cycles=1)
+                phase = runtime.scheduler.state["phase_control"]
+                self.assertEqual(phase["phase"], "explorer_admission")
+                self.assertEqual(phase["cycle"], 2)
+                next_deadline = datetime.fromisoformat(
+                    phase["explorer"]["admission_deadline"]
+                )
+                runtime.scheduler._reducer_now = (  # type: ignore[method-assign]
+                    lambda now=None: next_deadline if now is None else now
+                )
+                runtime.run(max_cycles=1)
+                self.assertEqual(invoked, ["worker", "main-sort", "main"])
+                phase = runtime.scheduler.state["phase_control"]
+                self.assertEqual(phase["phase"], "franta_run")
+                self.assertEqual(phase["cycle"], 2)
+                self.assertEqual(
+                    runtime.scheduler.state["calls"][phase["sort"]["planning_call_id"]][
+                        "status"
+                    ],
+                    "committed",
+                )
+            finally:
+                runtime.close()
+
+    def test_resume_discards_stale_completed_main_before_next_sort_planning(
+        self,
+    ) -> None:
+        """A legacy completed Main must not block fresh post-sort planning."""
+
+        for resume_phase in ("franta_drain", "explorer_admission", "franta_sort"):
+            with (
+                self.subTest(resume_phase=resume_phase),
+                tempfile.TemporaryDirectory() as raw,
+            ):
+                runtime = FrantaRuntime.initialize(
+                    load_manifest(_write_two_worker_manifest(Path(raw)))
+                )
+                try:
+                    runtime.scheduler.commit_initial_trim({"category_ids": []})
+                    _enter_test_franta_run(runtime)
+                    stale_call_id = runtime.scheduler.prepare_call(
+                        "main",
+                        runtime._main_context("BATCH-STALE-DEADLINE"),
+                        continuation={
+                            "reserved_batch_id": "BATCH-STALE-DEADLINE",
+                            "session_key": "main:project",
+                        },
+                    )
+                    lease_epoch, _ = runtime.scheduler.mark_call_running(stale_call_id)
+                    runtime.scheduler.accept_call_result(
+                        stale_call_id,
+                        lease_epoch,
+                        {
+                            "decision": "wait_for_results",
+                            "batch_id": None,
+                            "assignment_report_ids": [],
+                            "wait_for_task_ids": [
+                                runtime.scheduler.state["main_sort_tasks"][
+                                    "SORT-CONTROL-DEADLINE"
+                                ]
+                            ],
+                            "report": None,
+                            "decline_proof_writer": False,
+                        },
+                    )
+                    stale_call = runtime.scheduler.state["calls"][stale_call_id]
+                    deadline = datetime.fromisoformat(
+                        runtime.scheduler.state["phase_control"]["franta"][
+                            "admission_deadline"
+                        ]
+                    )
+                    runtime.scheduler.tick_alternation(now=deadline)
+                    if resume_phase != "franta_drain":
+                        runtime.scheduler.complete_franta_drain(now=deadline)
+                    if resume_phase == "franta_sort":
+                        phase = runtime.scheduler.state["phase_control"]
+                        next_deadline = datetime.fromisoformat(
+                            phase["explorer"]["admission_deadline"]
+                        )
+                        runtime.scheduler._reducer_now = (  # type: ignore[method-assign]
+                            lambda now=None: next_deadline if now is None else now
+                        )
+                        assert runtime.explorer_program is not None
+                        runtime.explorer_program.advance_turn()
+                        self.assertEqual(
+                            runtime.scheduler.alternation_phase, "franta_sort"
+                        )
+                    # Reproduce a persisted call created by the old run loop
+                    # after the one-time deadline cancellation had already run.
+                    with runtime.scheduler._mutate() as state:
+                        state["calls"][stale_call_id] = stale_call
+                    project_dir = runtime.layout.root
+                finally:
+                    runtime.close()
+
+                invoked: list[tuple[str, str]] = []
+
+                def executor(call: AgentCall) -> dict[str, Any]:
+                    invoked.append((call.kind, call.call_id))
+                    return _deadline_test_result(runtime, call)
+
+                runtime = FrantaRuntime.open(project_dir, executor=executor)
+                try:
+                    if resume_phase == "franta_drain":
+                        runtime.run(resume=True, max_cycles=1)
+                        self.assertEqual(
+                            runtime.scheduler.alternation_phase, "explorer_admission"
+                        )
+                    phase = runtime.scheduler.state["phase_control"]
+                    next_deadline = datetime.fromisoformat(
+                        phase["explorer"]["admission_deadline"]
+                    )
+                    runtime.scheduler._reducer_now = (  # type: ignore[method-assign]
+                        lambda now=None: next_deadline if now is None else now
+                    )
+                    runtime.run(resume=True, max_cycles=1)
+
+                    state = runtime.scheduler.state
+                    self.assertEqual(
+                        [kind for kind, _ in invoked], ["main-sort", "main"]
+                    )
+                    self.assertNotIn(
+                        stale_call_id, [call_id for _, call_id in invoked]
+                    )
+                    self.assertEqual(
+                        state["calls"][stale_call_id]["status"], "cancelled"
+                    )
+                    self.assertEqual(state["phase_control"]["phase"], "franta_run")
+                    self.assertEqual(state["phase_control"]["cycle"], 2)
+                    planning_id = state["phase_control"]["sort"]["planning_call_id"]
+                    self.assertEqual(state["calls"][planning_id]["status"], "committed")
+                    self.assertNotEqual(planning_id, stale_call_id)
+                    self.assertEqual(len(runtime._ordinary_worker_launches()), 1)
+                finally:
+                    runtime.close()
+
     def test_accepted_worker_is_not_launched_after_franta_deadline(self) -> None:
         """Only processes already started at the boundary belong to the drain."""
 

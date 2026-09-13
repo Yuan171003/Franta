@@ -1001,45 +1001,74 @@ class Scheduler:
             return str(phase_snapshot.get("phase") or "")
         at = self._reducer_now(now)
         with self._mutate() as state:
-            prior_phase = str(state["phase_control"].get("phase") or "")
             transition = phase_controller.tick(state["phase_control"], now=at)
             if transition.changed:
                 state["phase_control"] = copy.deepcopy(transition.state)
                 self._append_reducer_events_locked(state, transition.events)
             current_phase = str(state["phase_control"].get("phase") or "")
-            if (
-                prior_phase == phase_controller.Phase.FRANTA_RUN.value
-                and current_phase == phase_controller.Phase.FRANTA_DRAIN.value
-            ):
-                # Once Franta admission closes, stale planning/trim results must
-                # not be recovered in a later Explorer turn or create new
-                # assignments after the deadline.  Worker and downstream calls
-                # keep their separate graceful-drain semantics.
-                for call_id, call in state.get("calls", {}).items():
-                    if call.get("kind") not in {"main", "trimmer"} or call.get(
-                        "status"
-                    ) in {
-                        CallState.COMMITTED.value,
-                        CallState.CANCELLED.value,
-                        CallState.SUPERSEDED.value,
-                    }:
-                        continue
-                    _apply_call_event(
-                        state,
-                        call,
-                        call_machine.Cancel(
-                            authorized_by="alternation-controller",
-                            reason="Franta admission deadline elapsed",
-                        ),
-                    )
-                    self._resolve_attention(state, f"call:{call_id}")
-                    append_event(
-                        state,
-                        "franta_control_call_cancelled",
-                        {"call_id": call_id, "kind": call.get("kind")},
-                    )
-                state["halt_requested"] = _halt_required(state)
+            self._cancel_inadmissible_franta_controls_locked(state)
             return current_phase
+
+    def _cancel_inadmissible_franta_controls_locked(
+        self, state: MutableMapping[str, Any]
+    ) -> None:
+        """Retire expired controls, including records left by earlier builds.
+
+        This is a level check: a call created after the run-to-drain edge must
+        not survive into another research cycle. Worker and downstream calls
+        retain their independent graceful-drain semantics.
+        """
+
+        phase = self._alternation_phase_of(state)
+        if phase is None:
+            return
+        sort = state.get("phase_control", {}).get("sort") or {}
+        sort_call_id = sort.get("sort_call_id")
+        sort_call = state.get("calls", {}).get(sort_call_id, {})
+        sort_cursor = sort_call.get("event_cursor")
+        cancelled = False
+        for call_id, call in state.get("calls", {}).items():
+            if call.get("kind") not in {"main", "trimmer"} or call.get(
+                "status"
+            ) in {
+                CallState.COMMITTED.value,
+                CallState.CANCELLED.value,
+                CallState.SUPERSEDED.value,
+            }:
+                continue
+            if phase == "franta_run" and (
+                sort_cursor is None
+                or int(call.get("event_cursor", 0)) >= int(sort_cursor)
+            ):
+                continue
+            if (
+                phase == "franta_sort"
+                and call.get("kind") == "main"
+                and sort_call_id
+                and call.get("continuation", {}).get("post_sort_call_id")
+                == sort_call_id
+            ):
+                # A crash may occur between preparing this Main and opening
+                # Franta admission. The post-sort handoff must reuse it.
+                continue
+            _apply_call_event(
+                state,
+                call,
+                call_machine.Cancel(
+                    advance_epoch=True,
+                    authorized_by="alternation-controller",
+                    reason="Franta control call is outside its admission phase",
+                ),
+            )
+            self._resolve_attention(state, f"call:{call_id}")
+            append_event(
+                state,
+                "franta_control_call_cancelled",
+                {"call_id": call_id, "kind": call.get("kind")},
+            )
+            cancelled = True
+        if cancelled:
+            state["halt_requested"] = _halt_required(state)
 
     def admit_explorer_lineage(self, *, now: datetime | None = None) -> str:
         at = self._reducer_now(now)
