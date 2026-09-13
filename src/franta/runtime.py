@@ -1879,6 +1879,10 @@ class FrantaRuntime:
         while True:
             advisor_semantic_failure = False
             call_state = self.scheduler.state["calls"][call_id]
+            if call_state["kind"] in {"main", "trimmer"} and not (
+                self._franta_control_result_may_commit(call_id)
+            ):
+                return {}
             if call_state["status"] == CallState.COMPLETED.value:
                 return copy.deepcopy(dict(call_state["result"]))
             if (
@@ -1930,6 +1934,10 @@ class FrantaRuntime:
                         context=None,
                     )
                 value = self._invoke_agent(spec, root_fact_id=root_fact_id)
+                if call_state["kind"] in {"main", "trimmer"} and not (
+                    self._franta_control_result_may_commit(call_id)
+                ):
+                    return {}
                 try:
                     self._validate_control_result(
                         self._validation_kind(call_state), value
@@ -1950,6 +1958,8 @@ class FrantaRuntime:
                 self.scheduler.accept_call_result(call_id, lease_epoch, value)
                 return value
             except Exception as exc:
+                if call_state["kind"] in {"main", "trimmer"}:
+                    self.scheduler.tick_alternation()
                 current_status = self.scheduler.state["calls"].get(call_id, {}).get(
                     "status"
                 )
@@ -1957,6 +1967,13 @@ class FrantaRuntime:
                     CallState.CANCELLED.value,
                     CallState.SUPERSEDED.value,
                 }:
+                    cancellation = self.scheduler.state["calls"][call_id].get(
+                        "cancellation", {}
+                    )
+                    if call_state["kind"] in {"main", "trimmer"} and (
+                        cancellation.get("authorized_by") == "alternation-controller"
+                    ):
+                        return {}
                     raise TransportFailure(
                         f"call {call_id} was fenced while its process was exiting"
                     ) from exc
@@ -4132,7 +4149,14 @@ class FrantaRuntime:
 
     # ------------------------------------------------------------ main/trim
 
+    def _franta_planning_admitted(self) -> bool:
+        """Recheck the clock after blocking work and before new planning."""
+
+        return self.scheduler.tick_alternation() in {None, "franta_run"}
+
     def _main_should_run(self) -> bool:
+        if not self._franta_planning_admitted():
+            return False
         state = self.scheduler.state
         if self.scheduler.gate not in {GateState.OPEN, GateState.RESOLUTION_PENDING}:
             return False
@@ -4831,12 +4855,16 @@ class FrantaRuntime:
         return False
 
     def _run_main(self) -> bool:
+        if not self._franta_planning_admitted():
+            return False
         self._ingest_human_guidance()
         terminal = self.scheduler.gate == GateState.RESOLUTION_PENDING
         reserved_batch_id = f"BATCH-MAIN-{self.scheduler.event_cursor + 1:08d}"
         context = self._main_context(reserved_batch_id)
         context["terminal_resolution_call"] = terminal
         session_key = MAIN_SESSION_KEY
+        if not self._franta_planning_admitted():
+            return False
         call_id = self.scheduler.prepare_call(
             "main",
             context,
@@ -4870,8 +4898,12 @@ class FrantaRuntime:
         return True
 
     def _run_trim_review(self) -> bool:
+        if not self._franta_planning_admitted():
+            return False
         session_id = self.scheduler.start_trim_review_round()
         context = self._trimmer_context(phase="review")
+        if not self._franta_planning_admitted():
+            return False
         call_id = self.scheduler.prepare_call(
             "trimmer", context, continuation={"phase": "review", "session_id": session_id}
         )
@@ -5098,6 +5130,8 @@ class FrantaRuntime:
         self.scheduler.mark_call_committed(call_id)
 
     def _run_trim(self, *, initial: bool = False) -> bool:
+        if not self._franta_planning_admitted():
+            return False
         state = self.scheduler.state
         active = state["trim"].get("active_trim")
         if initial:
@@ -5112,6 +5146,8 @@ class FrantaRuntime:
         if initial:
             context["initial_trim"] = True
             context["required_portfolio_revision"] = 0
+        if not self._franta_planning_admitted():
+            return False
         call_id = self.scheduler.prepare_call(
             "trimmer", context, continuation={"phase": phase, "session_id": session_id}
         )
@@ -5618,7 +5654,7 @@ class FrantaRuntime:
     def _recover_control_calls(self) -> bool:
         """Resume or commit exact persisted main/trimmer calls before new planning."""
 
-        phase = self.scheduler.alternation_phase
+        phase = self.scheduler.tick_alternation()
         if phase not in {None, "franta_run"}:
             return False
         changed = False
@@ -5632,6 +5668,9 @@ class FrantaRuntime:
             }:
                 continue
             while True:
+                if not self._franta_control_result_may_commit(call_id):
+                    changed = True
+                    break
                 call = self.scheduler.state["calls"][call_id]
                 policy = policy_for(str(call["kind"]))
                 workspace = self._make_workspace(
@@ -5845,7 +5884,11 @@ class FrantaRuntime:
                                 progressed = True
                                 self._advance_operations()
                         gate = self.scheduler.gate
-                        if gate == GateState.REVIEWING_TRIM:
+                        if not self._franta_planning_admitted():
+                            # A worker batch may have crossed the deadline while
+                            # this iteration was in its ordinary-work branch.
+                            progressed = True
+                        elif gate == GateState.REVIEWING_TRIM:
                             self._run_trim_review()
                             progressed = True
                         elif gate == GateState.TRIMMING and self.scheduler.state["trim"].get("active_trim") and not self.scheduler.state.get("active_sprint_id"):
