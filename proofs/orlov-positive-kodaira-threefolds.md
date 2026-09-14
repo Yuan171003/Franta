@@ -759,7 +759,7 @@ has Kodaira dimension one. Its exceptional divisor is a horizontal fixed canonic
 
 **[Tod06]** Yukinobu Toda, *Fourier–Mukai transforms and canonical divisors*, Compositio Mathematica **142** (2006), no. 4, 962–982. [arXiv:math/0312015](https://arxiv.org/abs/math/0312015). We use Proposition 4.1, Lemmas 4.2–4.3, Corollary 4.4, and Lemma 7.3; the proof of Theorem 7.5, Step 1, contains the related free-locus comparison in Kodaira dimension two.
 
-Contact Information:
-Yuan Lu
-ETH Zürich
+Contact Information:  
+Yuan Lu  
+ETH Zürich  
 yuan171003@outlook.com
