@@ -2,15 +2,11 @@
 
 [中文说明](README.zh-CN.md)
 
-Remark. If you have any question regarding to the proofs listed in this repository, please contact:
-
-Yuan Lu\\
-ETH Zürich
-
-yuan.lu@math.ethz.ch
-
-yuan171003@outlook.com 
-
+Remark. If you have any question regarding to the proofs listed in this repository, please contact:<br>
+Yuan Lu<br>
+ETH Zürich<br>
+yuan.lu@math.ethz.ch<br>
+yuan171003@outlook.com<br>
 
 Franta is a recoverable multi-agent scheduler for long-running mathematical
 research. It coordinates a main agent, research workers, a trimmer, fact
