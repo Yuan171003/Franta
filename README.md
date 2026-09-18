@@ -2,7 +2,7 @@
 
 [中文说明](README.zh-CN.md)
 
-Remark. If you have any question regarding to the proofs listed in this repository, please contact:<br>
+Remark. If you have any question regarding to the proofs listed in this repository, please contact the author:<br>
 Yuan Lu<br>
 ETH Zürich<br>
 yuan.lu@math.ethz.ch<br>
