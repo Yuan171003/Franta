@@ -4,8 +4,7 @@
 
 Remark. If you have any question regarding to the proofs listed in this repository, please contact:
 
-Yuan Lu
-
+Yuan Lu\\
 ETH Zürich
 
 yuan.lu@math.ethz.ch
