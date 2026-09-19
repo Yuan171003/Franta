@@ -4,3 +4,9 @@ Proof files for the three-dimensional positive Kodaira dimension case:
 
 - LaTeX source: [proofs/orlov-positive-kodaira-threefolds.tex](proofs/orlov-positive-kodaira-threefolds.tex).
 - Compiled PDF: [proofs/orlov-positive-kodaira-threefolds.pdf](proofs/orlov-positive-kodaira-threefolds.pdf).
+
+Contact Information:<br>
+Yuan Lu<br>
+ETH Zürich<br>
+yuan.lu@math.ethz.ch<br>
+yuan171003@outlook.com
