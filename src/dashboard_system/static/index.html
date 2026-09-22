@@ -21,6 +21,16 @@
     <div id="global-error" class="notice error" role="alert" hidden></div>
     <section id="page-overview" class="page" hidden>
       <div class="page-heading"><div><p class="eyebrow">RESEARCH OBSERVATORY</p><h1 id="project-name">Research overview</h1></div><div class="heading-meta"><span id="run-status" class="badge">Loading</span><span id="run-phase">—</span></div></div>
+      <section id="attempt-budget-section" class="attempt-budget-section" aria-labelledby="attempt-budget-title" hidden>
+        <div class="section-heading"><div><p class="eyebrow">RESEARCH CYCLE</p><h2 id="attempt-budget-title">Worker attempt limits</h2></div><span class="quiet">Per phase · across all workers</span></div>
+        <form id="attempt-limits-form">
+          <div class="attempt-budget-grid">
+            <div class="attempt-budget-card"><div class="attempt-budget-heading"><h3>Explorer</h3><span id="explorer-attempt-limit" class="quiet">Active limit: 20</span></div><div class="attempt-budget-counts"><strong id="explorer-attempt-used">—</strong><span>started</span><span id="explorer-attempt-detail" class="quiet">Reading attempt counts…</span></div><label for="explorer-attempt-input">Attempt limit <input id="explorer-attempt-input" name="explorer_limit" type="number" min="1" step="1" value="20" required inputmode="numeric"></label></div>
+            <div class="attempt-budget-card"><div class="attempt-budget-heading"><h3>Main Franta</h3><span id="franta-attempt-limit" class="quiet">Active limit: 30</span></div><div class="attempt-budget-counts"><strong id="franta-attempt-used">—</strong><span>started</span><span id="franta-attempt-detail" class="quiet">Reading attempt counts…</span></div><label for="franta-attempt-input">Attempt limit <input id="franta-attempt-input" name="franta_limit" type="number" min="1" step="1" value="30" required inputmode="numeric"></label></div>
+          </div>
+          <div class="form-footer"><div><p class="form-hint">Each save takes effect after 2 minutes. Saving again restarts the countdown. Admitted tasks finish before the next phase.</p><p id="attempt-limit-pending" class="attempt-limit-pending" role="status" hidden></p><span id="attempt-limit-feedback" class="form-message" role="status"></span></div><button type="submit" class="button primary">Save limits</button></div>
+        </form>
+      </section>
       <details class="problem-disclosure"><summary>Research problem <span>Original problem</span></summary><div id="root-problem" class="prose"></div></details>
       <div class="metrics" aria-label="Run statistics">
         <div><span class="metric-label">Elapsed</span><strong id="elapsed">—</strong><small id="active-time">Active time has not been reported</small></div>

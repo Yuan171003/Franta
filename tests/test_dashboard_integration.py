@@ -29,6 +29,9 @@ from test_advisor_runtime_integration import _AdvisorExecutor, _enter_franta_dra
 
 class DashboardIntegrationTests(unittest.TestCase):
     def setUp(self) -> None:
+        from legacy_alternation import use_legacy_admission_windows
+
+        use_legacy_admission_windows(self)
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         self.runtime = FrantaRuntime.initialize(

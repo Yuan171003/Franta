@@ -37,6 +37,7 @@ class Commands:
     def __init__(self) -> None:
         self.guidance = []
         self.feedback = []
+        self.attempt_limits = []
 
     def submit_guidance(self, text: str) -> dict:
         self.guidance.append(text)
@@ -45,6 +46,10 @@ class Commands:
     def submit_advisor_feedback(self, request_id: str, response: dict) -> dict:
         self.feedback.append((request_id, response))
         return {"command_id": "CMD-1", "status": "queued"}
+
+    def submit_attempt_limits(self, explorer_limit: int, franta_limit: int) -> dict:
+        self.attempt_limits.append((explorer_limit, franta_limit))
+        return {"command_id": "ATL-1", "status": "queued"}
 
 
 class Model:
@@ -138,6 +143,26 @@ class DashboardServerTests(unittest.TestCase):
         response = {"choices": [{"candidate_id": "C-1"}], "instructions": "Follow this choice."}
         self.assertEqual(self.post("/api/advisor-feedback", {"request_id": "REQ-1", "response": response})[0], 202)
         self.assertEqual(self.commands.feedback, [("REQ-1", response)])
+
+    def test_attempt_limits_require_positive_integers_and_use_command_port(self) -> None:
+        status, _, body = self.post("/api/attempt-limits", {"explorer_limit": 20, "franta_limit": 30})
+        self.assertEqual(status, 202)
+        self.assertEqual(json.loads(body)["command_id"], "ATL-1")
+        self.assertEqual(self.commands.attempt_limits, [(20, 30)])
+        for invalid in (0, -1, True, 2.5, "20", None):
+            for field in ("explorer_limit", "franta_limit"):
+                with self.subTest(field=field, invalid=invalid):
+                    values = {"explorer_limit": 20, "franta_limit": 30, field: invalid}
+                    self.assertEqual(self.post("/api/attempt-limits", values)[0], 400)
+        for values in ({}, {"explorer_limit": 20}, {"explorer_limit": 20, "franta_limit": 30, "extra": 1}):
+            self.assertEqual(self.post("/api/attempt-limits", values)[0], 400)
+        self.assertEqual(self.commands.attempt_limits, [(20, 30)])
+
+    def test_attempt_limit_commands_require_same_origin_token(self) -> None:
+        values = {"explorer_limit": 20, "franta_limit": 30}
+        self.assertEqual(self.request("POST", "/api/attempt-limits", values)[0], 403)
+        self.assertEqual(self.post("/api/attempt-limits", values, Origin="https://evil.example")[0], 403)
+        self.assertEqual(self.commands.attempt_limits, [])
 
     def test_missing_wrong_token_and_cross_origin_commands_are_rejected(self) -> None:
         self.assertEqual(self.request("POST", "/api/guidance", {"text": "no token"})[0], 403)

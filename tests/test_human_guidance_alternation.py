@@ -95,6 +95,11 @@ def _empty_sort_result(call: AgentCall) -> dict:
 
 
 class HumanGuidanceAlternationTests(unittest.TestCase):
+    def setUp(self) -> None:
+        from legacy_alternation import use_legacy_admission_windows
+
+        use_legacy_admission_windows(self)
+
     def _advisor_deferral(self, arrival: str) -> None:
         with tempfile.TemporaryDirectory() as raw:
             advisor_executor = _AdvisorExecutor()

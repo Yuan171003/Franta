@@ -19,7 +19,7 @@ import stat
 import threading
 import time
 import uuid
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -412,6 +412,10 @@ class FrantaRuntime:
     ) -> None:
         self.layout = layout
         self.config = copy.deepcopy(dict(config))
+        self._attempt_limit_lock = threading.RLock()
+        if self.config.get("explorer", {}).get("enabled") is True:
+            self.config["explorer"].setdefault("explorer_attempt_limit", 20)
+            self.config["explorer"].setdefault("franta_attempt_limit", 30)
         # Schema additions are scheduler-owned and deterministic; refreshing
         # them also upgrades resumable projects without touching research data.
         write_schemas(layout.schemas)
@@ -1959,7 +1963,7 @@ class FrantaRuntime:
                 return value
             except Exception as exc:
                 if call_state["kind"] in {"main", "trimmer"}:
-                    self.scheduler.tick_alternation()
+                    self._tick_alternation()
                 current_status = self.scheduler.state["calls"].get(call_id, {}).get(
                     "status"
                 )
@@ -3229,64 +3233,67 @@ class FrantaRuntime:
     ) -> bool:
         """Open Franta admission and resume the project's one Main session."""
 
-        phase_session_key = session_key
-        main_session_key = MAIN_SESSION_KEY
-        if (
-            self.scheduler.gate == GateState.TRIMMING
-            and self.scheduler.state["trim"].get("portfolio") is None
-            and self.scheduler.state["trim"].get("active_trim") is None
-        ):
-            self.scheduler.open_assignment_without_trim()
+        with self._attempt_limit_lock:
+            phase_session_key = session_key
+            main_session_key = MAIN_SESSION_KEY
+            if (
+                self.scheduler.gate == GateState.TRIMMING
+                and self.scheduler.state["trim"].get("portfolio") is None
+                and self.scheduler.state["trim"].get("active_trim") is None
+            ):
+                self.scheduler.open_assignment_without_trim()
 
-        if self.scheduler.gate not in {
-            GateState.OPEN,
-            GateState.RESOLUTION_PENDING,
-        }:
-            return False
-        state = self.scheduler.state
-        existing = next(
-            (
-                call
-                for call in state["calls"].values()
-                if call.get("kind") == "main"
-                and call.get("continuation", {}).get("post_sort_call_id")
-                == sort_call_id
-                and call.get("status")
-                not in {CallState.CANCELLED.value, CallState.SUPERSEDED.value}
-            ),
-            None,
-        )
-        terminal = self.scheduler.gate == GateState.RESOLUTION_PENDING
-        if existing is None:
-            self._ingest_human_guidance()
-            reserved_batch_id = f"BATCH-MAIN-{self.scheduler.event_cursor + 1:08d}"
-            context = self._main_context(reserved_batch_id)
-            context["terminal_resolution_call"] = terminal
-            planning_call_id = self.scheduler.prepare_call(
-                "main",
-                context,
-                continuation={
-                    "reserved_batch_id": reserved_batch_id,
-                    "post_sort_call_id": sort_call_id,
-                    "session_key": main_session_key,
-                },
-                expected_event_cursor=int(context["event_cursor"]),
+            if self.scheduler.gate not in {
+                GateState.OPEN,
+                GateState.RESOLUTION_PENDING,
+            }:
+                return False
+            state = self.scheduler.state
+            existing = next(
+                (
+                    call
+                    for call in state["calls"].values()
+                    if call.get("kind") == "main"
+                    and call.get("continuation", {}).get("post_sort_call_id")
+                    == sort_call_id
+                    and call.get("status")
+                    not in {CallState.CANCELLED.value, CallState.SUPERSEDED.value}
+                ),
+                None,
             )
-            context = copy.deepcopy(
-                self.scheduler.state["calls"][planning_call_id]["input"]
-            )
-        else:
-            planning_call_id = str(existing["call_id"])
-            context = copy.deepcopy(dict(existing["input"]))
-            reserved_batch_id = str(
-                existing.get("continuation", {}).get("reserved_batch_id") or ""
-            )
-        if self.scheduler.alternation_phase == "franta_sort":
-            self.scheduler.open_franta_run(
-                sort_call_id=sort_call_id,
-                planning_call_id=planning_call_id,
-                session_key=phase_session_key,
-            )
+            terminal = self.scheduler.gate == GateState.RESOLUTION_PENDING
+            if existing is None:
+                self._ingest_human_guidance()
+                reserved_batch_id = f"BATCH-MAIN-{self.scheduler.event_cursor + 1:08d}"
+                context = self._main_context(reserved_batch_id)
+                context["terminal_resolution_call"] = terminal
+                planning_call_id = self._prepare_franta_control_call(
+                    "main",
+                    context,
+                    continuation={
+                        "reserved_batch_id": reserved_batch_id,
+                        "post_sort_call_id": sort_call_id,
+                        "session_key": main_session_key,
+                    },
+                    expected_event_cursor=int(context["event_cursor"]),
+                )
+                if planning_call_id is None:
+                    return False
+                context = copy.deepcopy(
+                    self.scheduler.state["calls"][planning_call_id]["input"]
+                )
+            else:
+                planning_call_id = str(existing["call_id"])
+                context = copy.deepcopy(dict(existing["input"]))
+                reserved_batch_id = str(
+                    existing.get("continuation", {}).get("reserved_batch_id") or ""
+                )
+            if self.scheduler.alternation_phase == "franta_sort":
+                self.scheduler.open_franta_run(
+                    sort_call_id=sort_call_id,
+                    planning_call_id=planning_call_id,
+                    session_key=phase_session_key,
+                )
         policy = policy_for("main")
         workspace = self._make_workspace(
             call_id=planning_call_id,
@@ -3813,15 +3820,19 @@ class FrantaRuntime:
     def _run_worker_batch(self, task_ids: Sequence[str]) -> bool:
         if not task_ids:
             return False
-        if self.scheduler.alternation_phase is not None:
-            # Check the admission clock at the last scheduler boundary before
-            # any new worker process is prepared.  Tasks accepted earlier but
-            # still pending are not "current workers" for graceful drain.
-            if self.scheduler.tick_alternation() != "franta_run":
-                return False
+        self._tick_alternation()
+        task_ids = [
+            task_id for task_id in task_ids
+            if self.scheduler.franta_worker_admission_open(task_id)
+        ]
+        if not task_ids:
+            return False
         launches: dict[str, tuple[str, int, MaterializedWorkspace]] = {}
         launch_generations: dict[str, tuple[int, int]] = {}
         for task_id in task_ids:
+            self._tick_alternation()
+            if not self.scheduler.franta_worker_admission_open(task_id):
+                continue
             try:
                 launch = self._prepare_worker_workspace(task_id)
                 generation = self._call_receipt_generation(launch[0])
@@ -3878,7 +3889,7 @@ class FrantaRuntime:
 
             while unfinished:
                 if self.scheduler.alternation_phase is not None:
-                    self.scheduler.tick_alternation()
+                    self._tick_alternation()
                 for task_id in list(unfinished):
                     future = futures[task_id]
                     if task_id in faulted_task_ids:
@@ -4149,10 +4160,22 @@ class FrantaRuntime:
 
     # ------------------------------------------------------------ main/trim
 
+    def _prepare_franta_control_call(
+        self, kind: str, context: Mapping[str, Any], **options: Any,
+    ) -> str | None:
+        try:
+            return self.scheduler.prepare_call(kind, context, **options)
+        except WorkflowError:
+            # A saved edit can reach its effective time inside the atomic
+            # scheduler check, even while the polling thread is excluded.
+            if self._tick_alternation() not in {None, "franta_run", "franta_sort"}:
+                return None
+            raise
+
     def _franta_planning_admitted(self) -> bool:
         """Recheck the clock after blocking work and before new planning."""
 
-        return self.scheduler.tick_alternation() in {None, "franta_run"}
+        return self._tick_alternation() in {None, "franta_run"}
 
     def _main_should_run(self) -> bool:
         if not self._franta_planning_admitted():
@@ -4234,6 +4257,16 @@ class FrantaRuntime:
                 )
 
     def _commit_main_result(
+        self, call_id: str, workspace: MaterializedWorkspace,
+    ) -> None:
+        # An operator update must not split validation, task admission, and
+        # completion of one control result across two admission policies.
+        with self._attempt_limit_lock:
+            if not self._franta_control_result_may_commit(call_id):
+                return
+            self._commit_main_result_locked(call_id, workspace)
+
+    def _commit_main_result_locked(
         self,
         call_id: str,
         workspace: MaterializedWorkspace,
@@ -4360,7 +4393,7 @@ class FrantaRuntime:
         phase = self.scheduler.alternation_phase
         if phase is None:
             return True
-        phase = self.scheduler.tick_alternation()
+        phase = self._tick_alternation()
         call = self.scheduler.state.get("calls", {}).get(call_id, {})
         return bool(
             phase in {"franta_sort", "franta_run"}
@@ -4855,26 +4888,29 @@ class FrantaRuntime:
         return False
 
     def _run_main(self) -> bool:
-        if not self._franta_planning_admitted():
-            return False
-        self._ingest_human_guidance()
-        terminal = self.scheduler.gate == GateState.RESOLUTION_PENDING
-        reserved_batch_id = f"BATCH-MAIN-{self.scheduler.event_cursor + 1:08d}"
-        context = self._main_context(reserved_batch_id)
-        context["terminal_resolution_call"] = terminal
-        session_key = MAIN_SESSION_KEY
-        if not self._franta_planning_admitted():
-            return False
-        call_id = self.scheduler.prepare_call(
-            "main",
-            context,
-            continuation={
-                "reserved_batch_id": reserved_batch_id,
-                "session_key": session_key,
-            },
-            expected_event_cursor=int(context["event_cursor"]),
-        )
-        context = copy.deepcopy(self.scheduler.state["calls"][call_id]["input"])
+        with self._attempt_limit_lock:
+            if not self._franta_planning_admitted():
+                return False
+            self._ingest_human_guidance()
+            terminal = self.scheduler.gate == GateState.RESOLUTION_PENDING
+            reserved_batch_id = f"BATCH-MAIN-{self.scheduler.event_cursor + 1:08d}"
+            context = self._main_context(reserved_batch_id)
+            context["terminal_resolution_call"] = terminal
+            session_key = MAIN_SESSION_KEY
+            if not self._franta_planning_admitted():
+                return False
+            call_id = self._prepare_franta_control_call(
+                "main",
+                context,
+                continuation={
+                    "reserved_batch_id": reserved_batch_id,
+                    "session_key": session_key,
+                },
+                expected_event_cursor=int(context["event_cursor"]),
+            )
+            if call_id is None:
+                return False
+            context = copy.deepcopy(self.scheduler.state["calls"][call_id]["input"])
         policy = policy_for("main")
         workspace = self._make_workspace(call_id=call_id, policy=policy, context=context)
         resume = self._main_session_resume(call_id)
@@ -4898,15 +4934,18 @@ class FrantaRuntime:
         return True
 
     def _run_trim_review(self) -> bool:
-        if not self._franta_planning_admitted():
-            return False
-        session_id = self.scheduler.start_trim_review_round()
-        context = self._trimmer_context(phase="review")
-        if not self._franta_planning_admitted():
-            return False
-        call_id = self.scheduler.prepare_call(
-            "trimmer", context, continuation={"phase": "review", "session_id": session_id}
-        )
+        with self._attempt_limit_lock:
+            if not self._franta_planning_admitted():
+                return False
+            session_id = self.scheduler.start_trim_review_round()
+            context = self._trimmer_context(phase="review")
+            if not self._franta_planning_admitted():
+                return False
+            call_id = self._prepare_franta_control_call(
+                "trimmer", context, continuation={"phase": "review", "session_id": session_id}
+            )
+            if call_id is None:
+                return False
         policy = policy_for("trimmer")
         workspace = self._make_workspace(call_id=call_id, policy=policy, context=context)
         session_key = f"trimmer:{session_id}"
@@ -5033,6 +5072,16 @@ class FrantaRuntime:
         self._advance_trim_to_select(continuation_call_id)
 
     def _commit_trimmer_result(
+        self, call_id: str, workspace: MaterializedWorkspace,
+    ) -> None:
+        # An operator update must not split validation, task admission, and
+        # completion of one control result across two admission policies.
+        with self._attempt_limit_lock:
+            if not self._franta_control_result_may_commit(call_id):
+                return
+            self._commit_trimmer_result_locked(call_id, workspace)
+
+    def _commit_trimmer_result_locked(
         self,
         call_id: str,
         workspace: MaterializedWorkspace,
@@ -5130,27 +5179,30 @@ class FrantaRuntime:
         self.scheduler.mark_call_committed(call_id)
 
     def _run_trim(self, *, initial: bool = False) -> bool:
-        if not self._franta_planning_admitted():
-            return False
-        state = self.scheduler.state
-        active = state["trim"].get("active_trim")
-        if initial:
-            session_id = "initial"
-            phase = "initial-maintain-select"
-        else:
-            if not active:
-                raise SchedulerError("trimming gate has no active trim")
-            session_id = str(active["session_id"])
-            phase = str(active.get("phase", "maintain"))
-        context = self._trimmer_context(phase=phase)
-        if initial:
-            context["initial_trim"] = True
-            context["required_portfolio_revision"] = 0
-        if not self._franta_planning_admitted():
-            return False
-        call_id = self.scheduler.prepare_call(
-            "trimmer", context, continuation={"phase": phase, "session_id": session_id}
-        )
+        with self._attempt_limit_lock:
+            if not self._franta_planning_admitted():
+                return False
+            state = self.scheduler.state
+            active = state["trim"].get("active_trim")
+            if initial:
+                session_id = "initial"
+                phase = "initial-maintain-select"
+            else:
+                if not active:
+                    raise SchedulerError("trimming gate has no active trim")
+                session_id = str(active["session_id"])
+                phase = str(active.get("phase", "maintain"))
+            context = self._trimmer_context(phase=phase)
+            if initial:
+                context["initial_trim"] = True
+                context["required_portfolio_revision"] = 0
+            if not self._franta_planning_admitted():
+                return False
+            call_id = self._prepare_franta_control_call(
+                "trimmer", context, continuation={"phase": phase, "session_id": session_id}
+            )
+            if call_id is None:
+                return False
         policy = policy_for("trimmer")
         workspace = self._make_workspace(call_id=call_id, policy=policy, context=context)
         session_key = f"trimmer:{session_id}"
@@ -5421,16 +5473,62 @@ class FrantaRuntime:
             raise ProjectNeedsAttention("; ".join(errors))
         return changed
 
+    def _finish_franta_drain(self) -> bool:
+        """Bind the handoff before a concurrent limit increase can reopen it."""
+
+        with self._attempt_limit_lock:
+            if (
+                self._tick_alternation() != "franta_drain"
+                or not self._franta_tail_is_drained()
+            ):
+                return False
+            if self.advisor_program is None:
+                self.scheduler.complete_franta_drain()
+                return True
+            if self.scheduler.gate == GateState.COMPLETED:
+                return False
+            if advisor_status(self.scheduler.advisor_state) == "idle":
+                # Only preparation is locked; the model call remains interruptible
+                # by operator-setting polling once the durable barrier is bound.
+                try:
+                    self._prepare_advisor_proposal(self._advisor_context())
+                except WorkflowError:
+                    if self._tick_alternation() != "franta_drain":
+                        return True
+                    raise
+        return self._advance_advisor()
+
+    def _franta_budget_draining(self) -> bool:
+        phase = self.scheduler.state.get("phase_control") or {}
+        return bool(
+            phase.get("phase") == "franta_drain"
+            and (phase.get("franta") or {}).get("drain_reason") == "attempt_budget"
+        )
+
     def _franta_tail_is_drained(self) -> bool:
         """Return whether no already-running Franta attempt/postprocess remains."""
 
         state = self.scheduler.state
+        if self.scheduler.gate == GateState.WAITING_FOR_HUMAN:
+            return False
         active_task_states = {
             TaskState.RUNNING.value,
             TaskState.STOPPING.value,
             TaskState.ATTEMPT_ENDED.value,
             TaskState.POSTPROCESSING.value,
         }
+        if self._franta_budget_draining():
+            sprint = state.get("sprints", {}).get(state.get("active_sprint_id"), {})
+            if sprint.get("status") in {
+                "running", "draining_after_root_resolution", "awaiting_summary"
+            }:
+                return False
+            active_task_states.update({
+                TaskState.QUEUED.value,
+                TaskState.LAUNCHING.value,
+                TaskState.RETRY_PENDING.value,
+                TaskState.REVISION_PENDING.value,
+            })
         if any(
             task.get("agent_system") != "franta-sort"
             and task.get("state") in active_task_states
@@ -5654,7 +5752,7 @@ class FrantaRuntime:
     def _recover_control_calls(self) -> bool:
         """Resume or commit exact persisted main/trimmer calls before new planning."""
 
-        phase = self.scheduler.tick_alternation()
+        phase = self._tick_alternation()
         if phase not in {None, "franta_run"}:
             return False
         changed = False
@@ -5763,7 +5861,7 @@ class FrantaRuntime:
         memory quota and leaves all unfinished state recoverable.
         """
 
-        with (nullcontext() if _lock_held else self.lock):
+        with (nullcontext() if _lock_held else self.lock), self._attempt_limit_polling():
             self._dashboard_run_started = time.time()
             self._record_dashboard_run("running")
             run_failed = False
@@ -5782,7 +5880,7 @@ class FrantaRuntime:
                     recovered_control_call = False
                     phase = self.scheduler.alternation_phase
                     if phase in {"franta_sort", "franta_run", "franta_drain"}:
-                        after_phase = self.scheduler.tick_alternation()
+                        after_phase = self._tick_alternation()
                         if after_phase != phase:
                             progressed = True
                     if self._recover_control_calls():
@@ -5826,7 +5924,7 @@ class FrantaRuntime:
                     phase = self.scheduler.alternation_phase
                     if not handled_by_alternation and phase is not None:
                         before_phase = phase
-                        phase = self.scheduler.tick_alternation()
+                        phase = self._tick_alternation()
                         if phase != before_phase:
                             progressed = True
                     if phase == "franta_sort":
@@ -5837,18 +5935,23 @@ class FrantaRuntime:
                         handled_by_alternation = True
                         if self.scheduler.stop_unlaunched_franta_tasks_for_drain():
                             progressed = True
+                        if self._franta_budget_draining():
+                            launchable = self._ordinary_worker_launches()
+                            if launchable and self._run_worker_batch(launchable):
+                                progressed = True
+                            state = self.scheduler.state
+                            active_sprint = state.get("active_sprint_id")
+                            sprint = state.get("sprints", {}).get(active_sprint, {})
+                            if sprint.get("status") in {
+                                "running", "draining_after_root_resolution", "awaiting_summary"
+                            } and self._advance_sprint():
+                                progressed = True
+                            if self._advance_operations():
+                                progressed = True
                         if self._reconcile_explorer_promotions():
                             progressed = True
-                        if self._franta_tail_is_drained():
-                            if (
-                                self.advisor_program is not None
-                                and self.scheduler.gate != GateState.COMPLETED
-                            ):
-                                if self._advance_advisor():
-                                    progressed = True
-                            elif self.advisor_program is None:
-                                self.scheduler.complete_franta_drain()
-                                progressed = True
+                        if self._finish_franta_drain():
+                            progressed = True
 
                     if (
                         not handled_by_alternation
@@ -5951,12 +6054,51 @@ class FrantaRuntime:
         except Exception:
             pass
 
+    def _tick_alternation(self) -> str | None:
+        """Adopt due operator limits before any phase or admission decision."""
+
+        with self._attempt_limit_lock:
+            self._ingest_attempt_limit_commands()
+            return self.scheduler.tick_alternation()
+
+    def _ingest_attempt_limit_commands(self) -> bool:
+        if not (self.layout.private / "dashboard" / "commands").is_dir():
+            return False
+        from .dashboard_commands import consume_attempt_limit_commands
+
+        with self._attempt_limit_lock:
+            return consume_attempt_limit_commands(self)
+
+    @contextmanager
+    def _attempt_limit_polling(self):
+        """Keep operator settings responsive during synchronous agent calls."""
+
+        if not self.config.get("explorer", {}).get("enabled"):
+            yield
+            return
+        stopped = threading.Event()
+
+        def poll() -> None:
+            while not stopped.wait(1.0):
+                self._tick_alternation()
+
+        thread = threading.Thread(
+            target=poll, name="franta-attempt-limits", daemon=True
+        )
+        thread.start()
+        try:
+            yield
+        finally:
+            stopped.set()
+            thread.join()
+
     def _ingest_dashboard_commands(self) -> bool:
         if not (self.layout.private / "dashboard" / "commands").is_dir():
             return False
         try:
             from .dashboard_commands import consume_advisor_commands
-            return consume_advisor_commands(self)
+            changed = self._ingest_attempt_limit_commands()
+            return consume_advisor_commands(self) or changed
         except Exception:
             # Optional UI transport failures must not stop research. An accepted
             # feedback command can be retried idempotently if its receipt failed.

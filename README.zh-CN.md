@@ -151,6 +151,15 @@ enabled = true
 Advisor 必须与 Explorer 一起启用，Explorer 可单独启用。禁用时删除对应表，
 不要设置 `enabled = false`。并发和时间配置见示例 TOML。
 
+Explorer 独立续跑和补位：一个 attempt 结束后，该 Explorer 可以继续下一个
+attempt，无需等待其他 Explorer。完成全部计划尝试后，只要准入窗口仍开放，
+就可用新的 Explorer 补位。窗口关闭后，现有 Explorer 完成剩余尝试，再交给 Franta。
+
+每个阶段所有 worker 合计达到默认 20 次 Explorer／30 次 Franta attempt 后，
+停止接新任务。已有任务的剩余尝试、验证和整合继续收尾，最终次数可以超过阈值。
+Dashboard 首页顶部显示计数并允许调整两个上限；最后一次保存修改 120 秒后生效，
+关闭网页或重启恢复不会丢失设置。
+
 Advisor 每次提出五项任务，等待你选择一到两项后才继续研究。通过 `status` 或网页
 获取真实请求 ID 和任务 ID，替换下例中的占位符：
 

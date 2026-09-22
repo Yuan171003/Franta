@@ -17,6 +17,8 @@ import sqlite3
 import threading
 from typing import Any, Iterator, Mapping
 
+from .attempt_budgets import attempt_budget_status
+from .dashboard_commands import latest_pending_attempt_limits
 from .human_guidance import read_human_guidance_inbox
 from .render import render_record
 from .store import MemoryStore
@@ -605,8 +607,23 @@ class FrantaDashboardRead:
             _json_file(path) for path in
             (self.root / "private/dashboard/receipts").glob("AFB-*.json")
         ]
+        budgets = attempt_budget_status(state)
+        budgets["available"] = budgets["enabled"] or (state.get("phase_control") or {}).get("enabled") is True
+        inbox_edit = latest_pending_attempt_limits(self.root)
+        if inbox_edit and budgets["available"]:
+            inbox_time = _instant(inbox_edit["created_at"])
+            accepted_time = _instant(budgets.get("latest_submitted_at"))
+            if accepted_time is None or (inbox_time, inbox_edit["command_id"]) > (accepted_time, budgets.get("latest_command_id") or ""):
+                budgets["pending"] = {
+                    "command_id": inbox_edit["command_id"],
+                    "explorer_limit": inbox_edit["explorer_limit"],
+                    "franta_limit": inbox_edit["franta_limit"],
+                    "submitted_at": inbox_edit["created_at"],
+                    "effective_at": inbox_edit["effective_at"],
+                }
         return {
             "project": project, "run": run, "usage": usage,
+            "attempt_budgets": budgets,
             "directions": self._directions(state, explorer),
             "workers": self._workers(state, active=run["status"] == "running"),
             "advisor": {

@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from concurrent.futures import Future, ThreadPoolExecutor
+from contextlib import nullcontext
 from dataclasses import dataclass
 import hashlib
 import time
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, ContextManager, Mapping
 
 from . import control
 from .contracts import ExplorerHandoff
@@ -43,6 +44,7 @@ class ExplorerProgram:
         collaborator: ExplorerCollaborator | None = None,
         poll_seconds: float = 0.2,
         continuous_refill: bool = False,
+        handoff_lock: ContextManager[Any] | None = None,
         executor_factory: Callable[..., ThreadPoolExecutor] = ThreadPoolExecutor,
     ) -> None:
         if not isinstance(poll_seconds, (int, float)) or poll_seconds < 0:
@@ -54,6 +56,7 @@ class ExplorerProgram:
         self.collaborator = collaborator
         self.poll_seconds = float(poll_seconds)
         self.continuous_refill = continuous_refill
+        self.handoff_lock = handoff_lock if handoff_lock is not None else nullcontext()
         self.executor_factory = executor_factory
 
     def _expire(self) -> tuple[str, ...]:
@@ -360,23 +363,24 @@ class ExplorerProgram:
 
         self.host.tick()
         progressed = self.run_wave()
-        self.host.tick()
-        if self.host.phase != "explorer_drain" or not self.host.explorer_is_drained():
-            return ExplorerTurnAdvance(handled=True, progressed=progressed)
+        with self.handoff_lock:
+            self.host.tick()
+            if self.host.phase != "explorer_drain" or not self.host.explorer_is_drained():
+                return ExplorerTurnAdvance(handled=True, progressed=progressed)
 
-        context = self.host.current_turn_context()
-        handoff = self.service.create_handoff(
-            context.turn_id,
-            root_candidate=context.root_candidate,
-            id_factory=self.collaborator.handoff_id_for,
-        )
-        receipt = self.collaborator.accept_explorer_handoff(handoff)
-        return ExplorerTurnAdvance(
-            handled=True,
-            progressed=True,
-            handoff=handoff,
-            collaborator_receipt=receipt,
-        )
+            context = self.host.current_turn_context()
+            handoff = self.service.create_handoff(
+                context.turn_id,
+                root_candidate=context.root_candidate,
+                id_factory=self.collaborator.handoff_id_for,
+            )
+            receipt = self.collaborator.accept_explorer_handoff(handoff)
+            return ExplorerTurnAdvance(
+                handled=True,
+                progressed=True,
+                handoff=handoff,
+                collaborator_receipt=receipt,
+            )
 
 
 __all__ = ["ExplorerProgram", "ExplorerProgramError", "ExplorerTurnAdvance"]

@@ -562,7 +562,7 @@ class FrantaExplorerHost:
         return int(self.runtime.config["explorer"]["max_workers"])
 
     def tick(self) -> None:
-        self.runtime.scheduler.tick_alternation()
+        self.runtime._tick_alternation()
 
     def expire_attempts(self) -> tuple[str, ...]:
         return tuple(self.runtime.scheduler.expire_explorer_attempts())
@@ -884,6 +884,8 @@ def build_explorer_program(runtime: Any) -> ExplorerProgram:
     return service.program(
         FrantaExplorerHost(runtime),
         FrantaExplorerCollaborator(runtime),
+        continuous_refill=True,
+        handoff_lock=runtime._attempt_limit_lock,
     )
 
 

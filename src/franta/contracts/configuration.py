@@ -81,6 +81,8 @@ class ExplorerSettings:
     attempt_seconds: int = 3 * 60 * 60
     explorer_admission_seconds: int = 2 * 60 * 60
     franta_admission_seconds: int = 8 * 60 * 60
+    explorer_attempt_limit: int = 20
+    franta_attempt_limit: int = 30
     max_scratch_per_attempt: int = 256
     max_scratch_per_turn: int = 4096
     max_abstract_bytes: int = 4096
@@ -95,6 +97,8 @@ class ExplorerSettings:
                 attempt_seconds=self.attempt_seconds,
                 explorer_admission_seconds=self.explorer_admission_seconds,
                 host_admission_seconds=self.franta_admission_seconds,
+                explorer_attempt_limit=self.explorer_attempt_limit,
+                host_attempt_limit=self.franta_attempt_limit,
                 max_scratch_per_attempt=self.max_scratch_per_attempt,
                 max_scratch_per_turn=self.max_scratch_per_turn,
                 max_abstract_bytes=self.max_abstract_bytes,
@@ -104,7 +108,7 @@ class ExplorerSettings:
             message = str(exc).replace(
                 "explorer.host_admission_seconds",
                 "explorer.franta_admission_seconds",
-            )
+            ).replace("explorer.host_attempt_limit", "explorer.franta_attempt_limit")
             if exc.code == "enabled_must_be_true":
                 message = (
                     "explorer.enabled must be true when the [explorer] table is present; "

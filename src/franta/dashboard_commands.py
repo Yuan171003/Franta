@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+import fcntl
 import hashlib
 import json
 import os
@@ -130,4 +131,108 @@ def consume_advisor_commands(runtime: Any) -> bool:
             publish_json(destination, receipt)
         except FileExistsError:
             pass
+    return changed
+
+
+def _attempt_limit_command(path: Path) -> dict[str, Any]:
+    command = _json(path)
+    if command.get("kind") != "attempt_limits" or command.get("command_id") != path.stem:
+        raise ValueError("invalid attempt limit command")
+    for field in ("explorer_limit", "franta_limit"):
+        if type(command.get(field)) is not int or command[field] < 1:
+            raise ValueError("Attempt limits must be positive integers")
+    submitted = datetime.fromisoformat(command["created_at"].replace("Z", "+00:00"))
+    if submitted.tzinfo is None:
+        raise ValueError("Attempt limit submission time must include a timezone")
+    command["created_at"] = submitted.astimezone(timezone.utc).isoformat()
+    command["effective_at"] = (submitted + timedelta(seconds=120)).astimezone(timezone.utc).isoformat()
+    return command
+
+
+def pending_attempt_limit_commands(project: str | Path) -> list[Path]:
+    directory = Path(project) / "private" / "dashboard"
+    if directory.is_symlink() or (directory / "commands").is_symlink():
+        return []
+    return [
+        path for path in sorted((directory / "commands").glob("ATL-*.json"))
+        if not (directory / "receipts" / path.name).exists()
+    ]
+
+
+def latest_pending_attempt_limits(project: str | Path) -> dict[str, Any] | None:
+    """Read the latest valid inbox edit without constructing a state writer."""
+
+    commands = []
+    for path in pending_attempt_limit_commands(project):
+        try:
+            commands.append(_attempt_limit_command(path))
+        except (OSError, ValueError, TypeError, KeyError, AttributeError, OverflowError):
+            continue
+    return max(commands, key=lambda item: (item["created_at"], item["command_id"]), default=None)
+
+
+def submit_attempt_limit_command(project: str | Path, explorer_limit: int,
+                                 franta_limit: int) -> dict[str, Any]:
+    """Persist each edit immediately; the runner owns delayed adoption."""
+
+    if any(type(value) is not int or value < 1 for value in (explorer_limit, franta_limit)):
+        raise ValueError("Attempt limits must be positive integers")
+    directory = dashboard_directory(project)
+    lock_path = directory / "attempt-limits.lock"
+    descriptor = os.open(lock_path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(descriptor, "r+") as guard:
+        fcntl.flock(guard, fcntl.LOCK_EX)
+        # Serialize browser tabs and keep a strict submission order, including
+        # edits arriving in the same clock tick. Immutable files survive restarts.
+        submitted = datetime.now(timezone.utc)
+        for path in (directory / "commands").glob("ATL-*.json"):
+            try:
+                previous = _attempt_limit_command(path)
+                submitted = max(submitted, datetime.fromisoformat(previous["created_at"]) + timedelta(microseconds=1))
+            except (OSError, ValueError, TypeError, KeyError, AttributeError, OverflowError):
+                continue
+        command_id = "ATL-" + uuid.uuid4().hex
+        command = {
+            "command_id": command_id, "kind": "attempt_limits",
+            "explorer_limit": explorer_limit, "franta_limit": franta_limit,
+            "created_at": submitted.isoformat(),
+            "effective_at": (submitted + timedelta(seconds=120)).isoformat(),
+        }
+        publish_json(directory / "commands" / f"{command_id}.json", command)
+    return {**command, "status": "queued"}
+
+
+def consume_attempt_limit_commands(runtime: Any) -> bool:
+    """Queue only the newest edit while the runner owns the project lock."""
+
+    pending: list[tuple[Path, dict[str, Any]]] = []
+
+    def receipt(path: Path, **result: Any) -> None:
+        destination = path.parent.parent / "receipts" / path.name
+        try:
+            publish_json(destination, {
+                "command_id": path.stem, "processed_at": datetime.now(timezone.utc).isoformat(),
+                **result,
+            })
+        except FileExistsError:
+            pass
+
+    for path in pending_attempt_limit_commands(runtime.layout.root):
+        try:
+            pending.append((path, _attempt_limit_command(path)))
+        except (OSError, ValueError, TypeError, KeyError, AttributeError, OverflowError) as exc:
+            receipt(path, status="rejected", error=str(exc))
+    if not pending:
+        return False
+    newest_path, newest = max(pending, key=lambda item: (item[1]["created_at"], item[1]["command_id"]))
+    changed = runtime.scheduler.queue_attempt_limits(
+        explorer_limit=newest["explorer_limit"], franta_limit=newest["franta_limit"],
+        command_id=newest["command_id"], submitted_at=newest["created_at"],
+    )
+    # Receipt publication follows the durable queue operation. A crash between
+    # them replays the same command ID instead of restarting its grace period.
+    receipt(newest_path, status="accepted", effective_at=newest["effective_at"])
+    for path, _command in pending:
+        if path != newest_path:
+            receipt(path, status="superseded", superseded_by=newest["command_id"])
     return changed

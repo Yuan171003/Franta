@@ -78,7 +78,7 @@ class CliStatusReadonlyTests(unittest.TestCase):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
                 with _initialize(Path(directory), mode) as runtime:
                     project = runtime.layout.root
-                    runtime.scheduler.prepare_call("main", {}, call_id="CALL-BEFORE-STATUS")
+                    runtime.scheduler.prepare_call("summarizer", {}, call_id="CALL-BEFORE-STATUS")
                     submit_human_guidance(project, "Check the boundary case.")
                     expected = runtime.status()
                     before_row = _control_row(runtime.layout.database)
@@ -112,7 +112,7 @@ class CliStatusReadonlyTests(unittest.TestCase):
                     before_revision = _control_row(runtime.layout.database)[0]
                     self._status(runtime.layout.root)
                     call_id = runtime.scheduler.prepare_call(
-                        "main", {}, call_id="CALL-AFTER-STATUS"
+                        "summarizer", {}, call_id="CALL-AFTER-STATUS"
                     )
                     self.assertEqual(call_id, "CALL-AFTER-STATUS")
                     self.assertEqual(

@@ -86,6 +86,9 @@ def _control_to_portable(state: Mapping[str, Any]) -> dict[str, Any]:
         value["settings"] = neutral
     if "franta" in value:
         value["host"] = value.pop("franta")
+    budget = value.get("attempt_budget")
+    if isinstance(budget, dict) and "franta" in budget.get("limits", {}):
+        budget["limits"]["host"] = budget["limits"].pop("franta")
     value["history"] = _adapt_history(value.get("history"), to_portable=True)
     return value
 
@@ -103,6 +106,9 @@ def _control_to_franta(state: Mapping[str, Any]) -> dict[str, Any]:
         value["settings"] = legacy
     if "host" in value:
         value["franta"] = value.pop("host")
+    budget = value.get("attempt_budget")
+    if isinstance(budget, dict) and "host" in budget.get("limits", {}):
+        budget["limits"]["franta"] = budget["limits"].pop("host")
     value["history"] = _adapt_history(value.get("history"), to_portable=False)
     return value
 
@@ -257,8 +263,14 @@ def complete_sort_barrier(
     )
 
 
-def tick(state: Mapping[str, Any], *, now: datetime | Clock) -> PhaseTransition:
-    return _transition_to_franta(_portable.tick(_control_to_portable(state), now=now))
+def tick(
+    state: Mapping[str, Any], *, now: datetime | Clock,
+    allow_budget_reopen: bool = True,
+) -> PhaseTransition:
+    return _transition_to_franta(_portable.tick(
+        _control_to_portable(state), now=now,
+        allow_budget_reopen=allow_budget_reopen,
+    ))
 
 
 def complete_franta_drain(

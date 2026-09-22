@@ -22,7 +22,7 @@ from dashboard_system.monitor import QUALITY_DIMENSIONS, validate_summary
 
 from .dashboard_commands import (
     consume_advisor_commands, dashboard_directory, pending_advisor_commands,
-    publish_json, submit_advisor_command,
+    publish_json, submit_advisor_command, submit_attempt_limit_command,
 )
 from .human_guidance import submit_human_guidance
 
@@ -70,6 +70,11 @@ class FrantaOperatorCommands:
     def submit_advisor_feedback(self, request_id: str,
                                response: Mapping[str, Any]) -> dict[str, Any]:
         return submit_advisor_command(self.project, request_id, response, read_port=self.read_port)
+
+    def submit_attempt_limits(self, explorer_limit: int, franta_limit: int) -> dict[str, Any]:
+        if not (self.read_port.overview().get("attempt_budgets") or {}).get("available"):
+            raise ValueError("Attempt limits require a project with Explorer phases")
+        return submit_attempt_limit_command(self.project, explorer_limit, franta_limit)
 
 
 _DIRECTION_FIELDS = ("title", "summary", "why_promising", "obstacles", "next_step")

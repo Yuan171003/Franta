@@ -57,16 +57,17 @@ codex = "codex"
 native_web_search = true
 
 # Explorer/Franta alternation is strictly opt-in. Uncomment the whole table for
-# up to four concurrent max-reasoning Explorer lineages, 3 attempts x 3
-# hours per lineage, a 2-hour Explorer admission window, then a selective
-# sort and 8-hour Franta window.
+# up to four concurrent max-reasoning Explorer lineages, 3 attempts per lineage,
+# and phase-wide admission thresholds of 20 Explorer / 30 Franta attempts.
+# Existing work finishes after the threshold is reached. Dashboard edits take
+# effect 120 seconds after the latest saved change.
 # [explorer]
 # enabled = true
 # max_workers = 4
 # attempts_per_worker = 3
 # attempt_seconds = 10800
-# explorer_admission_seconds = 7200
-# franta_admission_seconds = 28800
+# explorer_attempt_limit = 20
+# franta_attempt_limit = 30
 # max_scratch_per_attempt = 256
 # max_scratch_per_turn = 4096
 # max_abstract_bytes = 4096

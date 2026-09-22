@@ -144,6 +144,11 @@ def _record(
 
 
 class ExplorerConfigurationStatusRecoveryTests(unittest.TestCase):
+    def setUp(self) -> None:
+        from legacy_alternation import use_legacy_admission_windows
+
+        use_legacy_admission_windows(self)
+
     def test_explorer_opt_in_is_persisted_but_cannot_retrofit_a_legacy_project(
         self,
     ) -> None:
@@ -181,6 +186,8 @@ class ExplorerConfigurationStatusRecoveryTests(unittest.TestCase):
                         "attempt_seconds": 10_800,
                         "explorer_admission_seconds": 7_200,
                         "franta_admission_seconds": 28_800,
+                        "explorer_attempt_limit": 20,
+                        "franta_attempt_limit": 30,
                         "max_scratch_per_attempt": 256,
                         "max_scratch_per_turn": 4096,
                         "max_abstract_bytes": 4096,

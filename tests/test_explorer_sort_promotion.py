@@ -333,6 +333,11 @@ def _begin_sort(
 
 
 class ExplorerSortPromotionTests(unittest.TestCase):
+    def setUp(self) -> None:
+        from legacy_alternation import use_legacy_admission_windows
+
+        use_legacy_admission_windows(self)
+
     def test_main_sort_workspace_has_exact_read_only_frozen_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             runtime = _runtime(Path(raw))

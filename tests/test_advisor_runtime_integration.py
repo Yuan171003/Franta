@@ -325,6 +325,11 @@ def _exact_verifier_report(bundle: dict[str, Any]) -> dict[str, Any]:
 
 
 class AdvisorRuntimeIntegrationTests(unittest.TestCase):
+    def setUp(self) -> None:
+        from legacy_alternation import use_legacy_admission_windows
+
+        use_legacy_admission_windows(self)
+
     def test_advisor_topology_rejects_a_snapshotless_main_call(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             runtime = FrantaRuntime.initialize(

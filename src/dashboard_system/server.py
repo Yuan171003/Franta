@@ -225,6 +225,12 @@ class DashboardServer:
                         or not isinstance(body["response"], dict)):
                         raise _HTTPError(400, "Advisor feedback requires request_id and response")
                     self._json(202, owner.command_port.submit_advisor_feedback(body["request_id"], body["response"]))
+                elif path == "/api/attempt-limits":
+                    if (set(body) != {"explorer_limit", "franta_limit"}
+                        or any(type(body[key]) is not int or body[key] < 1
+                               for key in ("explorer_limit", "franta_limit"))):
+                        raise _HTTPError(400, "Attempt limits must be positive integers")
+                    self._json(202, owner.command_port.submit_attempt_limits(body["explorer_limit"], body["franta_limit"]))
                 else:
                     raise _HTTPError(404, "Command not found")
 

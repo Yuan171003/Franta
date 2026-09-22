@@ -193,11 +193,23 @@ to another machine is not a supported migration workflow.
 
 ## Explorer and Advisor
 
-With `[explorer] enabled = true`, Franta's manifest defaults allow a two-hour
-Explorer admission window, three attempts of up to three hours per lineage,
-and then an eight-hour Franta admission window. Already admitted work drains
-after admission closes, so a full turn can take longer than its admission
-window. The first Explorer clock begins after stable bootstrap, not at `init`.
+With `[explorer] enabled = true`, each Explorer phase defaults to 20 worker
+attempts and each Franta phase to 30, summed across all workers. Set
+`explorer_attempt_limit` and `franta_attempt_limit` in the Explorer table to
+choose initial thresholds. Each Explorer lineage still has three planned
+attempts, with the existing individual attempt timeout.
+
+Reaching a threshold closes admission for new tasks and planning calls.
+Already admitted work, remaining attempts, verification, and integration finish
+before the next phase, so the final count may exceed the threshold. Transport
+retries do not consume another research attempt. Counts reset for each phase.
+
+The dashboard overview shows attempt counts and editable limits. A saved change
+takes effect 120 seconds after the latest edit; another edit restarts the delay.
+The current limits remain active during that delay. Saved changes survive
+closing the page and restarting the runner. Increasing a limit can reopen a
+phase that is draining only because of its attempt count, until handoff to the
+next stage has begun. Existing projects adopt these defaults on resume.
 
 Explorer scratch and summaries are append-only and provisional. Only the
 task-bound sorter receives the frozen turn and may propose selected material

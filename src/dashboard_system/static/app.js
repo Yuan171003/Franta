@@ -2,7 +2,7 @@ import katex from './vendor/katex.js';
 
 const $ = (id) => document.getElementById(id);
 const page = location.pathname === '/main-memory' ? 'main' : location.pathname === '/explorer-memory' ? 'explorer' : 'overview';
-const state = { csrf: null, overview: null, overviewAt: 0, advisorKey: null, advisorSubmitted: null, choices: [], monitorBusy: false, monitorSubmitting: false, monitorEpoch: 0,
+const state = { csrf: null, overview: null, overviewAt: 0, advisorKey: null, advisorSubmitted: null, choices: [], monitorBusy: false, monitorSubmitting: false, monitorEpoch: 0, attemptLimitsDirty: false, attemptLimitsSubmitting: false, attemptLimitsSaved: null, attemptLimitsPending: null,
   main: { kind: 'all', q: '', offset: 0, limit: 20, serial: 0, selected: null, detailSerial: 0, mapSerial: 0, graphKey: null, graphModel: null },
   explorer: { q: '', serial: 0, scratch: { offset: 0, limit: 15 }, summary: { offset: 0, limit: 15 } }, openJournal: new Set() };
 const statusNames = { running: 'Running', pending: 'Pending delivery', ready: 'Ready', completed: 'Completed', delivered: 'Delivered', consumed: 'Delivered', queued: 'Queued', claimed: 'In progress', accepted: 'Accepted', assigned: 'Assigned', rejected: 'Rejected', disabled: 'Disabled', unknown: 'Unknown', failed: 'Failed', error: 'Error', stopped: 'Stopped', paused: 'Paused', idle: 'Idle', waiting: 'Waiting', waiting_for_human: 'Waiting for your feedback', waiting_for_feedback: 'Waiting for your feedback', awaiting_human: 'Waiting for your feedback', active: 'Active', done: 'Done', closed: 'Closed', verified: 'Verified', refuted: 'Refuted', blocked: 'Blocked', scheduled: 'Scheduled', planned: 'Planned', submitted: 'Submitted', proposed: 'Awaiting verification', launching: 'Launching', postprocessing: 'Post-processing', retry_pending: 'Retry pending' };
@@ -100,11 +100,42 @@ function renderWorkers(items) {
     return lane;
   }));
 }
+function updateAttemptLimitCountdown() {
+  const pending = state.attemptLimitsPending; const target = $('attempt-limit-pending');
+  target.hidden = !pending;
+  if (!pending) return;
+  const asOf = Date.parse(state.overview?.as_of);
+  const now = Number.isFinite(asOf) ? asOf + Math.max(0, Date.now() - state.overviewAt) : Date.now();
+  const remaining = Math.max(0, Math.ceil((Date.parse(pending.effective_at) - now) / 1000));
+  const limits = `Explorer ${number(pending.explorer_limit)} · Main Franta ${number(pending.franta_limit)}`;
+  target.textContent = remaining > 0 ? `Saved: ${limits}. Takes effect in ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}.` : `Saved: ${limits}. Grace period complete; waiting for the runtime to apply.`;
+}
+function renderAttemptBudgets(budgets = {}) {
+  const available = budgets.available ?? budgets.enabled ?? false;
+  $('attempt-budget-section').hidden = !available;
+  if (!available) { state.attemptLimitsPending = null; return; }
+  let pending = budgets.pending;
+  const saved = state.attemptLimitsSaved;
+  if (saved) {
+    if (budgets.latest_command_id === saved.command_id || Date.parse(budgets.latest_submitted_at) > Date.parse(saved.created_at)) state.attemptLimitsSaved = null;
+    else if (!pending || Date.parse(saved.created_at) >= Date.parse(pending.submitted_at)) pending = { ...saved, submitted_at: saved.created_at };
+  }
+  state.attemptLimitsPending = pending;
+  for (const [role, fallback] of [['explorer', 20], ['franta', 30]]) {
+    const budget = budgets[role] || { limit: fallback };
+    $(`${role}-attempt-limit`).textContent = `Active limit: ${number(budget.limit)}`;
+    $(`${role}-attempt-used`).textContent = number(budget.used);
+    $(`${role}-attempt-detail`).textContent = `${number(budget.completed)} completed · ${number(budget.running)} running`;
+    if (!state.attemptLimitsDirty && !state.attemptLimitsSubmitting) $(`${role}-attempt-input`).value = pending?.[`${role}_limit`] ?? budget.limit;
+  }
+  updateAttemptLimitCountdown();
+}
 function renderOverview(data) {
   state.overview = data; state.overviewAt = Date.now(); const run = data.run || {}; const usage = data.usage || {};
   $('project-name').textContent = data.project?.name || 'Research overview'; document.title = `${data.project?.name || 'Franta'} · Research Observatory`;
   const problem = text(data.project?.root_problem); if ($('root-problem').dataset.value !== problem) { $('root-problem').replaceChildren(markdown(problem || 'The research problem has not been reported.')); $('root-problem').dataset.value = problem; }
   $('run-status').replaceWith(Object.assign(badge(run.status), { id: 'run-status' })); $('run-phase').textContent = [run.phase, run.cycle == null ? '' : `Cycle ${run.cycle}`].filter(Boolean).join(' · ');
+  renderAttemptBudgets(data.attempt_budgets);
   updateClock(); $('total-tokens').textContent = shortNumber(usage.total_tokens); $('token-breakdown').textContent = [usage.input_tokens, usage.cached_input_tokens, usage.output_tokens].map(shortNumber).join(' / ');
   $('token-calls').textContent = `${number(usage.reported_calls ?? 0)} calls reported${usage.unreported_calls ? ` · ${number(usage.unreported_calls)} unreported` : ''}`;
   $('monitor-tokens').textContent = usage.monitor ? `Separate Monitor usage: ${shortNumber(usage.monitor.total_tokens)} tokens` : 'Separate Monitor usage · not reported';
@@ -289,6 +320,22 @@ async function loadExplorer(type) {
 function debounce(handler, delay = 300) { let timer; return (...args) => { clearTimeout(timer); timer = setTimeout(() => handler(...args), delay); }; }
 
 $(`page-${page}`).hidden = false; document.querySelector(`[data-page="${page}"]`)?.classList.add('active'); document.querySelector(`[data-page="${page}"]`)?.setAttribute('aria-current', 'page');
+for (const role of ['explorer', 'franta']) $(`${role}-attempt-input`).addEventListener('input', () => { state.attemptLimitsDirty = true; feedback('attempt-limit-feedback', 'Unsaved changes'); });
+$('attempt-limits-form').addEventListener('submit', async (event) => {
+  event.preventDefault(); if (state.attemptLimitsSubmitting) return;
+  const values = { explorer_limit: Number($('explorer-attempt-input').value), franta_limit: Number($('franta-attempt-input').value) };
+  if (Object.values(values).some((value) => !Number.isSafeInteger(value) || value < 1)) { feedback('attempt-limit-feedback', 'Enter a positive whole number for each limit.', true); return; }
+  const original = [$('explorer-attempt-input').value, $('franta-attempt-input').value];
+  const submit = event.currentTarget.querySelector('button[type="submit"]'); state.attemptLimitsSubmitting = true; submit.disabled = true; feedback('attempt-limit-feedback', 'Saving…');
+  try {
+    state.attemptLimitsSaved = await api('/api/attempt-limits', values);
+    if ($('explorer-attempt-input').value === original[0] && $('franta-attempt-input').value === original[1]) state.attemptLimitsDirty = false;
+    feedback('attempt-limit-feedback', state.attemptLimitsDirty ? 'Saved. Further edits are not saved yet.' : 'Saved.');
+    renderAttemptBudgets(state.overview?.attempt_budgets);
+    await loadOverview();
+  } catch (error) { feedback('attempt-limit-feedback', error.message, true); }
+  finally { state.attemptLimitsSubmitting = false; submit.disabled = false; }
+});
 $('guidance-form').addEventListener('submit', async (event) => { event.preventDefault(); const form = event.currentTarget; const submit = form.querySelector('button[type="submit"]'); if (submit.disabled) return; const value = $('guidance-text').value; if (!value.trim()) { feedback('guidance-feedback', 'Enter guidance before submitting.', true); return; } submit.disabled = true; feedback('guidance-feedback', 'Saving guidance…'); try { const result = await api('/api/guidance', { text: value }); if ($('guidance-text').value === value) $('guidance-text').value = ''; feedback('guidance-feedback', `Saved${result.guidance_id || result.id ? ` · ${result.guidance_id || result.id}` : ''} and waiting for delivery.`); await loadOverview(); } catch (error) { feedback('guidance-feedback', error.message, true); } finally { submit.disabled = false; } });
 $('advisor-form').addEventListener('submit', async (event) => { event.preventDefault(); const submit = event.currentTarget.querySelector('button[type="submit"]'); if (submit.disabled) return; const choices = state.choices.map((id) => ({ kind: 'listed', obligation_id: id })); for (const id of ['custom-obligation', 'custom-obligation-2']) if ($(id).value.trim()) choices.push({ kind: 'custom', statement: $(id).value.trim() }); if (choices.length < 1 || choices.length > 2) { feedback('advisor-feedback', 'Choose or enter one or two obligations in total.', true); return; } const requestId = state.overview?.advisor?.status === 'waiting_for_human' ? state.overview?.advisor?.request_id : null; if (!requestId) { feedback('advisor-feedback', 'There is no Advisor request waiting for feedback.', true); return; } submit.disabled = true; for (const input of document.querySelectorAll('#advisor-form textarea,#advisor-choices input')) input.disabled = true; feedback('advisor-feedback', 'Submitting…'); try { await api('/api/advisor-feedback', { request_id: requestId, response: { choices, instructions: $('advisor-instructions').value.trim() } }); state.advisorSubmitted = requestId; if (state.overview?.advisor?.request_id === requestId) feedback('advisor-feedback', 'Submitted. Waiting for the research runtime to accept it.'); for (const input of document.querySelectorAll('#advisor-form input,#advisor-form textarea,#advisor-choices input')) input.disabled = true; await loadOverview(); } catch (error) { if (state.overview?.advisor?.request_id === requestId) { feedback('advisor-feedback', error.message, true); submit.disabled = false; for (const input of document.querySelectorAll('#advisor-form textarea,#advisor-choices input')) input.disabled = false; } } });
 $('refresh-monitor').addEventListener('click', async () => { if (state.monitorBusy || state.monitorSubmitting) return; state.monitorBusy = true; state.monitorSubmitting = true; state.monitorEpoch++; monitorButton(); try { await api('/api/monitor/refresh', {}); state.monitorSubmitting = false; await loadMonitor(); } catch (error) { errorAt('monitor-error', error); state.monitorBusy = false; } finally { state.monitorSubmitting = false; monitorButton(); } });
@@ -299,7 +346,7 @@ $('refresh-main').addEventListener('click', async () => { $('refresh-main').disa
 $('reset-graph').addEventListener('click', resetMemoryGraph);
 $('refresh-explorer').addEventListener('click', async () => { $('refresh-explorer').disabled = true; try { await loadExplorer(); } finally { $('refresh-explorer').disabled = false; } });
 loadOverview();
-if (page === 'overview') { loadMonitor(); setInterval(updateClock, 1000); }
+if (page === 'overview') { loadMonitor(); setInterval(() => { updateClock(); updateAttemptLimitCountdown(); }, 1000); }
 if (page === 'main') { loadMain(); loadMemoryMap(); const selected = new URLSearchParams(location.search).get('id'); if (selected) loadDetail(selected); }
 if (page === 'explorer') { const query = new URLSearchParams(location.search).get('q') || ''; state.explorer.q = query; $('explorer-search').value = query; loadExplorer(); }
 setInterval(() => { if (!document.hidden) { loadOverview(); if (page === 'overview') loadMonitor(); } }, 5000);

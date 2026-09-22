@@ -164,6 +164,18 @@ The sequence is `Explorer → Franta → Advisor → Explorer → …`. Advisor 
 Explorer; Explorer can run without Advisor. Omit a table to disable that
 subsystem. The example manifest documents timing and concurrency settings.
 
+Explorer refills worker slots independently: when an attempt finishes, that
+Explorer can start its next attempt without waiting for peers. Once it has
+finished all planned attempts, a new Explorer can take its slot while admission
+remains open. After admission closes, existing Explorers finish their remaining
+attempts before the handoff to Franta.
+
+Each phase stops admitting new tasks after 20 Explorer or 30 Franta worker
+attempts by default. Existing tasks finish their remaining attempts and
+postprocessing, so the final count can exceed the threshold. The dashboard
+overview shows the counts and lets you change both limits; the latest saved
+edit takes effect after 120 seconds and survives a runner restart.
+
 Advisor proposes five obligations, then pauses research until you choose one
 or two. Obtain the request and obligation IDs from `franta status PROJECT` or
 the dashboard. For example:

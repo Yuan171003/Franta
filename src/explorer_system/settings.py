@@ -34,6 +34,8 @@ class ExplorerSettings:
     attempt_seconds: int = 4 * 60 * 60
     explorer_admission_seconds: int = 2 * 60 * 60
     host_admission_seconds: int = 8 * 60 * 60
+    explorer_attempt_limit: int = 20
+    host_attempt_limit: int = 30
     max_scratch_per_attempt: int = 256
     max_scratch_per_turn: int = 4096
     max_abstract_bytes: int = 4096
@@ -64,6 +66,8 @@ class ExplorerSettings:
             "attempt_seconds",
             "explorer_admission_seconds",
             "host_admission_seconds",
+            "explorer_attempt_limit",
+            "host_attempt_limit",
         ):
             value = getattr(self, name)
             if not isinstance(value, int) or isinstance(value, bool) or value <= 0:

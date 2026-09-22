@@ -262,6 +262,11 @@ def _deadline_test_result(
 
 
 class RuntimeAlternationEndToEndTests(unittest.TestCase):
+    def setUp(self) -> None:
+        from legacy_alternation import use_legacy_admission_windows
+
+        use_legacy_admission_windows(self)
+
     def test_resume_reuses_current_post_sort_main_without_relaunching_result(
         self,
     ) -> None:
@@ -946,6 +951,10 @@ class RuntimeAlternationEndToEndTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             runtime: FrantaRuntime | None = None
+            peer_started = threading.Event()
+            fast_continued = threading.Event()
+            peer_released = threading.Event()
+            continued_before_peer_exit: list[bool] = []
 
             def trusted_stage(
                 call: AgentCall,
@@ -971,10 +980,22 @@ class RuntimeAlternationEndToEndTests(unittest.TestCase):
                 if call.kind != "explorer-worker":
                     raise AssertionError(f"unexpected deterministic call {call.kind}")
                 lineage_id = str(call.payload["worker_session_id"])
+                attempt = int(call.payload["attempt_number"])
                 if lineage_id.endswith("00000001"):
+                    if attempt == 1:
+                        if not peer_started.wait(timeout=5):
+                            raise AssertionError("the slow peer never started")
+                    elif attempt == 2 and not fast_continued.is_set():
+                        continued_before_peer_exit.append(not peer_released.is_set())
+                        fast_continued.set()
                     raise RuntimeError("deterministic exhausted Explorer attempt")
 
-                suffix = lineage_id.rsplit("-", 1)[-1]
+                if attempt == 1:
+                    peer_started.set()
+                    if not fast_continued.wait(timeout=5):
+                        raise AssertionError("the fast lineage waited for its slow peer")
+                    peer_released.set()
+                suffix = f"{lineage_id.rsplit('-', 1)[-1]}-{attempt}"
                 progress = trusted_stage(
                     call,
                     "record-scratch",
@@ -995,7 +1016,7 @@ class RuntimeAlternationEndToEndTests(unittest.TestCase):
                     "record-summary",
                     {
                         "operation_id": f"OP-SUMMARY-{suffix}",
-                        "abstract": "The surviving peer completed its first attempt.",
+                        "abstract": f"The surviving peer completed attempt {attempt}.",
                         "content": "The peer produced one provisional line of progress.",
                         "directions_tried": ["Independent surviving peer direction"],
                         "main_progress": "One peer attempt completed normally.",
@@ -1017,17 +1038,35 @@ class RuntimeAlternationEndToEndTests(unittest.TestCase):
             try:
                 runtime.start_services()
                 runtime.scheduler.activate_alternation()
+                runtime.scheduler.admit_explorer_lineage()
+                runtime.scheduler.admit_explorer_lineage()
+                deadline = datetime.fromisoformat(
+                    runtime.scheduler.state["phase_control"]["explorer"][
+                        "admission_deadline"
+                    ]
+                )
+                runtime.scheduler._reducer_now = (  # type: ignore[method-assign]
+                    lambda now=None: deadline if now is None else now
+                )
                 self.assertTrue(runtime._run_explorer_wave())
+                self.assertTrue(continued_before_peer_exit)
+                self.assertTrue(all(continued_before_peer_exit))
                 control = runtime.scheduler.state["explorer_control"]
                 self.assertEqual(len(control["lineages"]), 2)
                 failed = control["lineages"]["XLINEAGE-00000001"]
                 peer = control["lineages"]["XLINEAGE-00000002"]
-                self.assertEqual(failed["attempts_started"], 1)
-                self.assertEqual(failed["attempts"][-1]["outcome"], "failed")
-                self.assertEqual(failed["status"], "continuation_pending")
-                self.assertEqual(peer["attempts_started"], 1)
-                self.assertEqual(peer["attempts"][-1]["outcome"], "progress")
-                self.assertEqual(peer["status"], "continuation_pending")
+                self.assertEqual(failed["attempts_started"], 3)
+                self.assertEqual(
+                    [item["outcome"] for item in failed["attempts"]],
+                    ["failed", "failed", "failed"],
+                )
+                self.assertEqual(failed["status"], "closed")
+                self.assertEqual(peer["attempts_started"], 3)
+                self.assertEqual(
+                    [item["outcome"] for item in peer["attempts"]],
+                    ["progress", "progress", "progress"],
+                )
+                self.assertEqual(peer["status"], "closed")
             finally:
                 runtime.close()
 
@@ -1077,7 +1116,7 @@ class RuntimeAlternationEndToEndTests(unittest.TestCase):
                     call,
                     "record-scratch",
                     {
-                        "operation_id": "OP-OVERDUE-PROGRESS-2",
+                        "operation_id": f"OP-OVERDUE-PROGRESS-{attempt}",
                         "record_kind": "progress",
                         "abstract": "The continuation starts only after expiration.",
                         "content": (
@@ -1092,11 +1131,11 @@ class RuntimeAlternationEndToEndTests(unittest.TestCase):
                     call,
                     "record-summary",
                     {
-                        "operation_id": "OP-OVERDUE-SUMMARY-2",
+                        "operation_id": f"OP-OVERDUE-SUMMARY-{attempt}",
                         "abstract": "The post-expiration continuation ran normally.",
                         "content": "No stale attempt code was executed after recovery.",
                         "directions_tried": ["Fresh post-expiration reduction"],
-                        "main_progress": "The second planned attempt started cleanly.",
+                        "main_progress": f"Planned attempt {attempt} started cleanly.",
                         "main_obstacles": "ROOT remains open.",
                         "source_scratch_ids": [str(progress["record_id"])],
                     },
@@ -1154,16 +1193,16 @@ class RuntimeAlternationEndToEndTests(unittest.TestCase):
 
                 self.assertTrue(runtime._run_explorer_wave())
 
-                self.assertEqual(invoked_attempts, [2])
+                self.assertEqual(invoked_attempts, [2, 3])
                 state = runtime.scheduler.state
                 self.assertEqual(state["calls"][stale_call_id]["status"], "cancelled")
                 lineage = state["explorer_control"]["lineages"][lineage_id]
-                self.assertEqual(lineage["attempts_started"], 2)
+                self.assertEqual(lineage["attempts_started"], 3)
                 self.assertEqual(
                     [item["outcome"] for item in lineage["attempts"]],
-                    ["timed_out", "progress"],
+                    ["timed_out", "progress", "progress"],
                 )
-                self.assertEqual(lineage["status"], "continuation_pending")
+                self.assertEqual(lineage["status"], "closed")
             finally:
                 expiration_ran.set()
                 runtime.close()
@@ -1545,10 +1584,10 @@ class RuntimeAlternationEndToEndTests(unittest.TestCase):
             try:
                 runtime.scheduler.commit_initial_trim({"category_ids": []})
                 runtime._main_should_run = lambda: False
-                # One cycle for each planned Explorer attempt; the third cycle
-                # also executes the sort barrier and the project's first Main
-                # continuation.  Stop before ordinary Franta trim review begins.
-                runtime.run(max_cycles=3)
+                # Continuous refill finishes all planned Explorer attempts in
+                # one cycle, then executes the sort barrier and first Main
+                # continuation. Stop before ordinary Franta trim review begins.
+                runtime.run(max_cycles=1)
 
                 self.assertEqual(runtime.scheduler.alternation_phase, "franta_run")
                 self.assertEqual(

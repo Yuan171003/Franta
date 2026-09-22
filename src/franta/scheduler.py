@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Iterable, Iterator, Mapping, MutableMapping, Sequence
 
 from .execution_gateway import call_state as call_machine
+from . import attempt_budgets
 from .trim_category import control as trim_control
 from .exploration_control import snapshots as exploration_snapshots
 from .exploration_control import state as exploration_state
@@ -730,12 +731,17 @@ class Scheduler:
         state: Mapping[str, Any],
         *,
         sort_task: bool = False,
+        task_id: str | None = None,
     ) -> None:
         """Enforce alternation at the scheduler boundary, not only selectors."""
 
         phase = cls._alternation_phase_of(state)
         if phase is None:
             return
+        if task_id is not None and not sort_task and attempt_budgets.is_budget_drain(state):
+            task = state.get("tasks", {}).get(task_id) or {}
+            if task.get("attempt_budget_cycle") == int(state["phase_control"]["cycle"]):
+                return
         required = "franta_sort" if sort_task else "franta_run"
         if phase != required:
             raise WorkflowError(
@@ -833,6 +839,13 @@ class Scheduler:
                 raise IdempotencyConflict(
                     "Explorer attempt settings differ from persisted configuration"
                 )
+            if "explorer_attempt_limit" in settings or "franta_attempt_limit" in settings:
+                attempt_budgets.install(
+                    state,
+                    explorer_limit=settings.get("explorer_attempt_limit", 20),
+                    franta_limit=settings.get("franta_attempt_limit", 30),
+                )
+                self._tick_alternation_locked(state, at=at)
             phase = state["phase_control"]
             if defer_start and "alternation_clock_started_at" not in phase:
                 # `franta init` may precede the first foreground run by days.
@@ -994,20 +1007,72 @@ class Scheduler:
     def tick_alternation(self, *, now: datetime | None = None) -> str | None:
         if self._alternation_phase_of(self._state) is None:
             return None
-        phase_snapshot = self._state.get("phase_control", {})
-        if phase_snapshot.get("deferred_start") and not phase_snapshot.get(
-            "alternation_clock_started_at"
-        ):
-            return str(phase_snapshot.get("phase") or "")
         at = self._reducer_now(now)
+        phase = self._state.get("phase_control", {})
+        if phase.get("deferred_start") and not phase.get("alternation_clock_started_at"):
+            pending = (phase.get("attempt_budget") or {}).get("pending")
+            if not pending or at < datetime.fromisoformat(pending["effective_at"]):
+                return str(phase.get("phase") or "")
         with self._mutate() as state:
-            transition = phase_controller.tick(state["phase_control"], now=at)
-            if transition.changed:
-                state["phase_control"] = copy.deepcopy(transition.state)
-                self._append_reducer_events_locked(state, transition.events)
-            current_phase = str(state["phase_control"].get("phase") or "")
-            self._cancel_inadmissible_franta_controls_locked(state)
-            return current_phase
+            return self._tick_alternation_locked(state, at=at)
+
+    def _tick_alternation_locked(
+        self, state: MutableMapping[str, Any], *, at: datetime
+    ) -> str | None:
+        if self._alternation_phase_of(state) is None:
+            return None
+        if attempt_budgets.enabled(state):
+            applied = attempt_budgets.apply_pending(state, now=at)
+            if applied is not None:
+                append_event(state, "attempt_limits_applied", applied)
+            attempt_budgets.refresh_counts(state)
+        phase = state["phase_control"]
+        if phase.get("deferred_start") and not phase.get("alternation_clock_started_at"):
+            return str(phase.get("phase") or "")
+        # Fence historical inadmissible controls before a raised limit can
+        # reopen admission. Reopening must never revive an old Main result.
+        self._cancel_inadmissible_franta_controls_locked(state)
+        advisor_active = bool((state.get("advisor_control") or {}).get("active"))
+        transition = phase_controller.tick(
+            phase, now=at, allow_budget_reopen=not advisor_active,
+        )
+        if transition.changed:
+            state["phase_control"] = copy.deepcopy(transition.state)
+            self._append_reducer_events_locked(state, transition.events)
+        self._cancel_inadmissible_franta_controls_locked(state)
+        return str(state["phase_control"].get("phase") or "")
+
+    def queue_attempt_limits(
+        self, *, explorer_limit: int, franta_limit: int,
+        command_id: str, submitted_at: datetime | str,
+    ) -> bool:
+        """Persist the latest valid operator edit; activation waits 120 seconds."""
+
+        with self._mutate() as state:
+            accepted = attempt_budgets.queue_limits(
+                state, explorer_limit=explorer_limit, franta_limit=franta_limit,
+                command_id=command_id, submitted_at=submitted_at,
+            )
+            if accepted:
+                append_event(state, "attempt_limits_queued", state["phase_control"]["attempt_budget"]["pending"])
+            return accepted
+
+    def franta_worker_admission_open(self, task_id: str) -> bool:
+        """Allow an already-admitted task's complete tail during budget drain."""
+
+        self.tick_alternation()
+        with self._lock:
+            task = self._state.get("tasks", {}).get(task_id)
+            if not isinstance(task, Mapping):
+                return False
+            try:
+                self._require_franta_admission_locked(
+                    self._state, task_id=task_id,
+                    sort_task=task.get("agent_system") == "franta-sort",
+                )
+            except WorkflowError:
+                return False
+            return True
 
     def _cancel_inadmissible_franta_controls_locked(
         self, state: MutableMapping[str, Any]
@@ -1073,6 +1138,8 @@ class Scheduler:
     def admit_explorer_lineage(self, *, now: datetime | None = None) -> str:
         at = self._reducer_now(now)
         with self._mutate() as state:
+            if attempt_budgets.enabled(state):
+                self._tick_alternation_locked(state, at=at)
             phase = state.get("phase_control")
             control = state.get("explorer_control")
             if not isinstance(phase, Mapping) or not isinstance(control, Mapping):
@@ -1210,6 +1277,8 @@ class Scheduler:
             )
             state["explorer_control"] = copy.deepcopy(transition.state)
             self._append_reducer_events_locked(state, transition.events)
+            if attempt_budgets.enabled(state):
+                self._tick_alternation_locked(state, at=at)
             return {
                 "call_id": call_id,
                 "lineage_id": lineage_id,
@@ -1555,6 +1624,7 @@ class Scheduler:
                 raise WorkflowError(
                     "Advisor-enabled Franta drain must commit its problem assignment"
                 )
+            self._retire_budget_planning_locked(state, at=at)
             transition = phase_controller.complete_franta_drain(
                 state["phase_control"], franta_drained=True, now=at
             )
@@ -1568,6 +1638,43 @@ class Scheduler:
             )
             state["phase_control"] = copy.deepcopy(transition.state)
             self._append_reducer_events_locked(state, transition.events)
+
+    def _retire_budget_planning_locked(
+        self, state: MutableMapping[str, Any], *, at: datetime
+    ) -> None:
+        """Archive unlaunched planning only once this budget turn hands off.
+
+        An increased limit may reopen drain until this boundary. Keep pending
+        planning intact until then; completed sprint summaries remain durable
+        without claiming that a skipped trimmer integration occurred.
+        """
+
+        if not attempt_budgets.is_budget_drain(state):
+            return
+        stamp = at.isoformat()
+        cycle = int(state["phase_control"]["cycle"])
+        sprint_id = state.get("active_sprint_id")
+        if sprint_id:
+            sprint = state["sprints"][sprint_id]
+            if any(state["tasks"][task_id]["state"] != TaskState.CLOSED.value for task_id in sprint.get("task_ids", [])):
+                raise WorkflowError("budget handoff requires all admitted sprint tasks to finish")
+            if sprint.get("status") in {"running", "draining_after_root_resolution", "awaiting_summary", "needs_attention"}:
+                raise WorkflowError("budget handoff requires sprint postprocessing to finish")
+            sprint["phase_budget_closure"] = {"cycle": cycle, "closed_at": stamp, "prior_status": sprint.get("status")}
+            state["active_sprint_id"] = None
+            append_event(state, "sprint_closed_at_budget_handoff", {"sprint_id": sprint_id, "cycle": cycle})
+        gate = GateState(state["gate"])
+        if gate in {GateState.TRIMMING, GateState.REVIEWING_TRIM}:
+            trim = state["trim"]
+            trim.setdefault("phase_budget_history", []).append({
+                "cycle": cycle, "closed_at": stamp,
+                "active_trim": copy.deepcopy(trim.get("active_trim")),
+                "active_review": copy.deepcopy(trim.get("active_review")),
+            })
+            trim["active_trim"] = None
+            trim["active_review"] = None
+            self._transition_gate(state, GateState.OPEN)
+            append_event(state, "trim_closed_at_budget_handoff", {"cycle": cycle})
 
     @staticmethod
     def _append_advisor_events_locked(
@@ -1588,11 +1695,14 @@ class Scheduler:
 
         exact_context = copy.deepcopy(dict(context))
         with self._mutate() as state:
+            if attempt_budgets.enabled(state):
+                self._tick_alternation_locked(state, at=self._reducer_now())
             control = state.get("advisor_control")
             if not isinstance(control, Mapping):
                 raise WorkflowError("Advisor is not enabled")
             if self._alternation_phase_of(state) != "franta_drain":
                 raise WorkflowError("Advisor proposal requires a drained Franta turn")
+            self._retire_budget_planning_locked(state, at=self._reducer_now())
             source_cycle = self._research_cycle_of(state)
             if (
                 exact_context.get("advisor_index") != source_cycle
@@ -1812,6 +1922,8 @@ class Scheduler:
         with self._mutate() as state:
             if self._alternation_phase_of(state) != "franta_drain":
                 return ()
+            if attempt_budgets.is_budget_drain(state):
+                return ()
             for task_id, task in state.get("tasks", {}).items():
                 if task.get("agent_system") == "franta-sort" or task.get(
                     "non_slot_task"
@@ -2003,6 +2115,16 @@ class Scheduler:
     ) -> str:
         """Create one call inside its owner's control-state transaction."""
 
+        if kind in {"main", "trimmer"} and attempt_budgets.enabled(state):
+            phase = self._tick_alternation_locked(state, at=self._reducer_now())
+            sort = state["phase_control"].get("sort") or {}
+            post_sort_main = (
+                kind == "main" and phase == "franta_sort"
+                and sort.get("sort_call_id")
+                and (continuation or {}).get("post_sort_call_id") == sort["sort_call_id"]
+            )
+            if phase != "franta_run" and not post_sort_main:
+                raise WorkflowError("Franta control admission is closed")
         payload = copy.deepcopy(dict(exact_input))
         digest = stable_digest(payload)
         calls = state["calls"]
@@ -2846,6 +2968,8 @@ class Scheduler:
         reports = [copy.deepcopy(dict(report)) for report in assign_reports]
         digest = stable_digest(reports)
         with self._mutate() as state:
+            if attempt_budgets.enabled(state):
+                self._tick_alternation_locked(state, at=self._reducer_now())
             human_guidance = None
             guidance_record = None
             if human_guidance_call_id is not None:
@@ -3060,6 +3184,8 @@ class Scheduler:
                 }
                 if self._alternation_phase_of(state) is not None:
                     state["tasks"][task_id]["agent_system"] = "franta"
+                    if attempt_budgets.enabled(state):
+                        state["tasks"][task_id]["attempt_budget_cycle"] = int(state["phase_control"]["cycle"])
                     state["tasks"][task_id]["origin_phase_epoch"] = int(
                         state["phase_control"].get("phase_epoch", 0)
                     )
@@ -3282,11 +3408,13 @@ class Scheduler:
 
     def start_task_attempt(self, task_id: str) -> int:
         with self._mutate() as state:
+            if attempt_budgets.enabled(state):
+                self._tick_alternation_locked(state, at=self._reducer_now())
             task = state["tasks"].get(task_id)
             if not task:
                 raise SchedulerError(f"unknown task {task_id}")
             self._require_franta_admission_locked(
-                state, sort_task=task.get("agent_system") == "franta-sort"
+                state, sort_task=task.get("agent_system") == "franta-sort", task_id=task_id
             )
             current = TaskState(task["state"])
             if current not in {
@@ -3354,6 +3482,8 @@ class Scheduler:
             task["current_attempt"] = attempt_no
             task["launch_intent"] = False
             self._transition_task(state, task, TaskState.RUNNING)
+            if attempt_budgets.enabled(state):
+                self._tick_alternation_locked(state, at=self._reducer_now())
             return attempt_no
 
     def worker_call_lease(self, task_id: str) -> dict[str, Any]:

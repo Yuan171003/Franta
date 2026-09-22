@@ -238,6 +238,9 @@ def explorer_admission_open(
     explorer = state.get("explorer")
     if not isinstance(explorer, Mapping):
         raise PhaseControlError("Explorer phase metadata is missing")
+    budget = state.get("attempt_budget")
+    if isinstance(budget, Mapping):
+        return int(explorer.get("attempts_used", 0)) < int(budget["limits"]["explorer"])
     return _instant(now) < _parse(
         explorer.get("admission_deadline"), "explorer.admission_deadline"
     )
@@ -461,11 +464,49 @@ def _request_host_drain(
     )
 
 
-def tick(state: Mapping[str, Any], *, now: datetime | Clock) -> PhaseTransition:
-    """Apply only deadline-driven transitions; all barriers stay explicit."""
+def tick(
+    state: Mapping[str, Any], *, now: datetime | Clock,
+    allow_budget_reopen: bool = True,
+) -> PhaseTransition:
+    """Apply the configured admission threshold; handoff barriers stay explicit."""
 
     at = _instant(now)
     phase = state.get("phase")
+    budget = state.get("attempt_budget")
+    if isinstance(budget, Mapping):
+        stage = {
+            Phase.EXPLORER_ADMISSION.value: "explorer",
+            Phase.EXPLORER_DRAIN.value: "explorer",
+            Phase.HOST_RUN.value: "host",
+            Phase.HOST_DRAIN.value: "host",
+        }.get(phase)
+        if stage is None:
+            return PhaseTransition(state=copy.deepcopy(dict(state)), changed=False)
+        metadata = state.get(stage) or {}
+        limit = _positive_seconds(budget["limits"][stage], f"{stage}_attempt_limit")
+        used = int(metadata.get("attempts_used", 0))
+        running_phase = Phase.EXPLORER_ADMISSION if stage == "explorer" else Phase.HOST_RUN
+        draining_phase = Phase.EXPLORER_DRAIN if stage == "explorer" else Phase.HOST_DRAIN
+        if phase == running_phase.value and used >= limit:
+            if stage == "explorer":
+                return request_explorer_drain(state, reason="attempt_budget", now=at)
+            return _request_host_drain(state, reason="attempt_budget", at=at)
+        if (
+            phase == draining_phase.value
+            and metadata.get("drain_reason") == "attempt_budget"
+            and used < limit
+            and allow_budget_reopen
+            and not metadata.get("root_candidate")
+        ):
+            value = copy.deepcopy(dict(state))
+            value[stage]["admission_closed_at"] = None
+            value[stage]["drain_reason"] = None
+            _enter(value, running_phase, at)
+            return _replacement(
+                state, value,
+                _event(f"{stage}_admission_reopened", at, attempts_used=used, attempt_limit=limit),
+            )
+        return PhaseTransition(state=copy.deepcopy(dict(state)), changed=False)
     if phase == Phase.EXPLORER_ADMISSION.value:
         explorer = state.get("explorer")
         if not isinstance(explorer, Mapping):

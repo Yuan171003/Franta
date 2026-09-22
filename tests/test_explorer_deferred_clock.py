@@ -42,6 +42,11 @@ foundation_policy = "Use only the declared test axioms."
 
 
 class ExplorerDeferredClockTests(unittest.TestCase):
+    def setUp(self) -> None:
+        from legacy_alternation import use_legacy_admission_windows
+
+        use_legacy_admission_windows(self)
+
     def test_init_days_before_run_does_not_consume_explorer_admission(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             runtime = FrantaRuntime.initialize(
