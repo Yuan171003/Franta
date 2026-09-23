@@ -22,7 +22,7 @@ from explorer_system.agents import (
 # Reviewed Franta release snapshots. The prompt builders retain the supplied
 # research semantics; branding and previously stale snapshots are refreshed.
 UNGUIDED_SHA256 = {
-    "franta:main": "f274e169aa600e3dd743d3d9a6350186051ba162f6541db664d103f3845e6645",
+    "franta:main": "86b07bc9f0d572e0832ca1221485bbada80073faf9023e57b3c74a9c8c4ecb0f",
     "franta:worker:research": "7963d8756c51d74af62dbcd23ff1cd678831cdb8c01dbf8929b01daf42830746",
     "franta:worker:brainstorm": "37cd40fe0caeef01f8704744fcfb48cd0ec90a027e9547f3aa68e9d6eb5ca399",
     "franta:worker:associate": "365dbfe26f822262c03804e92203a5d721d772f521b83a644c84557c66e082f6",

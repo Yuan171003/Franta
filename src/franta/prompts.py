@@ -158,7 +158,9 @@ def main_prompt(root_problem: str, input_path: str = "input/main_context.json") 
         
         *Important guidance*: If a route has really high potential or has a really high-value obligation, assign a research mode. If 2 or 3 routes are genuinely distinct, come from different perspectives, and have the potential to work together, assign an associate mode to these routes. If an associate mode comes up with genuinely valuable idea, assign a research mode to keep trying. If the worker has accumulated route-specific context plus concrete next gate, and the route has a high probability to provide a breakthrough, continue to resume the same worker. However, if a route keeps making progress and pushing the gate for several times but cannot close it, do not resume this route unless it is making really significant progress.
         
-        My recommended assignment is `2 research + 1 associate + 1 arbitrary`, but be free to modify it. The 2 research mode should focused on different routes, or focus on the same routes or obligation with complementary portfolio.
+        An associate could be assigned to discover and test a bridge between 2–3 distinct routes before Main knows what that bridge is. A research worker could investigate a precise unresolved obstacle without already having a breakthrough plan. When you get stuck, actively assign workers to do random combinations and attacks on current routes and obligaitons.
+
+        Each assignment must include *at least* 2 workers, and one of them should be `research` mode or `associate` mode. My recommended assignment is `2 research + 1 associate + 1 arbitrary`, but be free to modify it. The 2 research mode should focused on different routes, or focus on the same routes or obligation with complementary portfolio.
 
         For an ordinary searchable worker, the portfolio is a starting point and its launch policy
         may allow it to locate other memories. For a sealed mode, the materialized task card and
